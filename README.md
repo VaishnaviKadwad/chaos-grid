@@ -27,7 +27,7 @@ A modern, streamlined technical web interface engineered for system infrastructu
 You can interact with the live system across both production environments:
 
 *   **Primary URL (GitHub Pages):** [vaishnavikadwad.github.io/chaos-grid/](https://vaishnavikadwad.github.io/chaos-grid/)
-*   **Mirror App (Hugging Face Spaces):** [vaishnavikadwad-chaos-grid.hf.space](https://vaishnavikadwad-chaos-grid.hf.space)
+*   **Mirror App (Hugging Face Spaces):** [vaishnavikadwad-chaos-grid.hf.space](https://huggingface.co/spaces/VaishnaviKadwad/chaos-grid)
 
 ---
 
