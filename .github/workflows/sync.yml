@@ -11,5 +11,5 @@ jobs:
           fetch-depth: 0
       - name: Push to HF
         run: |
-          git remote add hf https://YOUR_HF_USERNAME:${{ secrets.HF_TOKEN }}@huggingface.co/spaces/YOUR_HF_USERNAME/chaos-grid
+          git remote add hf https://VaishnaviKadwad:${{ secrets.HF_TOKEN }}@huggingface.co/spaces/VaishnaviKadwad/chaos-grid
           git push hf main --force
