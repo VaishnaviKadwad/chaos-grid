@@ -1,0 +1,2072 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CHAOS GRID — Civic Hazard Analysis & Optimization System</title>
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=JetBrains+Mono:wght@300;400;500;600&family=Oswald:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<style>
+:root {
+  --bg:        #000000;
+  --bg2:       #080808;
+  --panel:     #0d0d0d;
+  --card:      #111111;
+  --border:    #1a1a1a;
+  --border2:   #2a2a2a;
+  --blue:      #ffffff;
+  --blue2:     #e0e0e0;
+  --blue3:     #aaaaaa;
+  --blue-glow: rgba(255,255,255,0.08);
+  --blue-dim:  #333333;
+  --green:     #39ff7a;
+  --green-dim: #0a1a10;
+  --warn:      #ffcc00;
+  --teal:      #00ffcc;
+  --white:     #ffffff;
+  --text:      #888888;
+  --dim:       #222222;
+  --dim2:      #555555;
+  --gold:      #ffcc00;
+  --status-r:  #ff3344;
+  --status-g:  #39ff7a;
+  --status-w:  #ffcc00;
+  --accent:    #ffffff;
+}
+
+*,*::before,*::after{margin:0;padding:0;box-sizing:border-box;}
+html{height:100%;font-size:16px;}
+body{
+  height:100%;overflow:hidden;background:var(--bg);color:var(--white);
+  font-family:'Syne',sans-serif;display:flex;flex-direction:column;position:relative;
+}
+body::before{
+  content:'';position:fixed;inset:0;pointer-events:none;z-index:0;
+  background-image:
+    linear-gradient(rgba(255,255,255,0.012) 1px,transparent 1px),
+    linear-gradient(90deg,rgba(255,255,255,0.012) 1px,transparent 1px);
+  background-size:48px 48px;
+}
+
+::-webkit-scrollbar{width:4px;}
+::-webkit-scrollbar-track{background:transparent;}
+::-webkit-scrollbar-thumb{background:var(--border2);border-radius:2px;}
+
+/* ─── TOP NAV ─── */
+#topNav{
+  position:relative;z-index:200;height:56px;
+  background:rgba(0,0,0,0.98);
+  border-bottom:1px solid var(--border2);
+  display:flex;align-items:center;flex-shrink:0;
+  backdrop-filter:blur(16px);
+}
+.logo{
+  padding:0 24px;font-family:'Oswald',sans-serif;font-size:1.4rem;font-weight:600;
+  color:var(--white);letter-spacing:6px;cursor:pointer;flex-shrink:0;
+  border-right:1px solid var(--border2);height:100%;display:flex;align-items:center;
+  text-shadow:0 0 40px rgba(255,255,255,0.15);
+}
+.logo span{color:var(--teal);}
+.logo-sub{font-family:'JetBrains Mono',monospace;font-size:0.42rem;color:var(--dim2);letter-spacing:1px;margin-top:2px;}
+.nav-tabs{display:flex;flex:1;height:100%;}
+.nav-tab{
+  flex:1;height:100%;background:transparent;border:none;border-right:1px solid var(--border);
+  color:var(--dim2);font-family:'JetBrains Mono',monospace;font-size:0.55rem;
+  letter-spacing:1.5px;text-transform:uppercase;cursor:pointer;transition:all .2s;
+  display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;
+  position:relative;
+}
+.nav-tab .ti{font-size:1rem;}
+.nav-tab .tl{font-size:0.46rem;letter-spacing:2px;}
+.nav-tab:hover{background:rgba(255,255,255,0.03);color:var(--white);}
+.nav-tab.active{background:rgba(255,255,255,0.05);color:var(--white);}
+.nav-tab.active::after{content:'';position:absolute;bottom:0;left:0;right:0;height:1px;background:var(--white);}
+.nav-right{
+  display:flex;align-items:center;gap:8px;padding:0 16px;
+  border-left:1px solid var(--border2);flex-shrink:0;
+}
+.nav-pill{font-family:'JetBrains Mono',monospace;font-size:0.58rem;color:var(--dim2);display:flex;align-items:center;gap:7px;}
+.xp-track{width:56px;height:2px;background:var(--border2);border-radius:1px;}
+.xp-fill{height:100%;width:62%;background:var(--white);border-radius:1px;}
+.nav-ico{
+  width:32px;height:32px;background:transparent;border:1px solid var(--border2);
+  color:var(--dim2);display:flex;align-items:center;justify-content:center;
+  cursor:pointer;font-size:0.85rem;transition:all .2s;border-radius:3px;
+}
+.nav-ico:hover{border-color:var(--white);color:var(--white);}
+.nav-ico.ok{border-color:var(--teal);color:var(--teal);}
+.notif-wrap{position:relative;}
+.notif-pip{
+  position:absolute;top:4px;right:4px;width:5px;height:5px;
+  border-radius:50%;background:var(--teal);animation:pip .9s ease-in-out infinite alternate;
+}
+@keyframes pip{from{opacity:1}to{opacity:.2}}
+
+/* ─── MAIN ─── */
+#appMain{flex:1;overflow:hidden;position:relative;z-index:1;}
+.screen{
+  position:absolute;inset:0;overflow-y:auto;overflow-x:hidden;
+  opacity:0;pointer-events:none;transform:translateY(8px);
+  transition:opacity .22s ease,transform .22s ease;z-index:1;
+}
+.screen.active{opacity:1;pointer-events:all;transform:translateY(0);z-index:2;}
+
+/* ─── SHARED ─── */
+.wrap{max-width:960px;margin:0 auto;padding:30px 24px;}
+.pg-title{
+  font-family:'Oswald',sans-serif;font-size:1.8rem;font-weight:500;letter-spacing:3px;
+  color:var(--white);margin-bottom:4px;line-height:1.1;
+}
+.pg-sub{
+  font-family:'JetBrains Mono',monospace;font-size:0.6rem;
+  color:var(--dim2);letter-spacing:2px;margin-bottom:28px;
+}
+.sec-hdr{
+  display:flex;align-items:center;justify-content:space-between;
+  margin-bottom:14px;padding-bottom:10px;border-bottom:1px solid var(--border2);
+}
+.sec-ttl{
+  font-family:'JetBrains Mono',monospace;font-size:0.65rem;font-weight:500;
+  color:var(--white);letter-spacing:2.5px;display:flex;align-items:center;gap:8px;
+}
+.badge{
+  font-family:'JetBrains Mono',monospace;font-size:0.5rem;
+  padding:3px 9px;border:1px solid;letter-spacing:1px;border-radius:2px;
+}
+.badge-b{border-color:var(--white);color:var(--white);background:rgba(255,255,255,.06);}
+.badge-w{border-color:var(--warn);color:var(--warn);background:rgba(255,204,0,.06);}
+.badge-g{border-color:var(--green);color:var(--green);background:rgba(57,255,122,.06);}
+.badge-gold{border-color:var(--gold);color:var(--gold);background:rgba(255,204,0,.06);}
+.badge-t{border-color:var(--teal);color:var(--teal);background:rgba(0,255,204,.06);}
+
+.live-dot{
+  width:7px;height:7px;border-radius:50%;background:var(--teal);
+  box-shadow:0 0 6px var(--teal);animation:ld 1.2s ease-in-out infinite;
+}
+@keyframes ld{0%,100%{transform:scale(1);opacity:1}50%{transform:scale(1.8);opacity:.35}}
+
+/* Buttons */
+.btn{
+  padding:11px 22px;font-family:'Syne',sans-serif;font-weight:700;
+  font-size:0.78rem;letter-spacing:2px;cursor:pointer;border:none;
+  transition:all .22s;position:relative;overflow:hidden;display:inline-flex;align-items:center;gap:8px;
+  border-radius:2px;
+}
+.btn::before{content:'';position:absolute;inset:0;transform:translateX(-100%);transition:.25s;z-index:0;}
+.btn span,.btn-icon{position:relative;z-index:1;}
+.btn-b{background:transparent;border:1px solid var(--white);color:var(--white);}
+.btn-b::before{background:var(--white);}
+.btn-b:hover{color:#000;box-shadow:0 0 24px rgba(255,255,255,0.12);}
+.btn-t{background:transparent;border:1px solid var(--teal);color:var(--teal);}
+.btn-t::before{background:var(--teal);}
+.btn-t:hover{color:#000;}
+.btn-g{background:transparent;border:1px solid var(--green);color:var(--green);}
+.btn-g::before{background:var(--green);}
+.btn-g:hover{color:#000;}
+.btn-ghost{background:transparent;border:1px solid var(--border2);color:var(--dim2);}
+.btn-ghost::before{background:rgba(255,255,255,.04);}
+.btn-ghost:hover{color:var(--text);}
+.btn:hover::before{transform:translateX(0);}
+
+/* Inputs */
+.inp{
+  width:100%;background:var(--bg2);border:1px solid var(--border2);
+  padding:10px 14px;color:var(--white);font-family:'JetBrains Mono',monospace;
+  font-size:0.74rem;outline:none;transition:border-color .2s;border-radius:2px;
+}
+.inp:focus{border-color:var(--white);box-shadow:0 0 0 1px rgba(255,255,255,.08);}
+.inp::placeholder{color:var(--dim);}
+.inp-lbl{font-family:'JetBrains Mono',monospace;font-size:0.54rem;color:var(--dim2);letter-spacing:2px;margin-bottom:5px;display:block;}
+.fg{display:flex;flex-direction:column;gap:5px;}
+
+/* Card */
+.card{background:var(--card);border:1px solid var(--border2);border-radius:3px;transition:border-color .2s;}
+.card:hover{border-color:var(--dim2);}
+
+/* Info panel */
+.info-panel{
+  background:var(--bg2);border:1px solid var(--border2);border-left:2px solid var(--white);
+  padding:14px 16px;font-family:'JetBrains Mono',monospace;font-size:0.62rem;
+  color:var(--text);line-height:2;border-radius:0 3px 3px 0;
+}
+.info-panel .ip-b{color:var(--white);}
+.info-panel .ip-g{color:var(--green);}
+.info-panel .ip-d{color:var(--dim2);}
+
+/* Progress */
+.prog-wrap{margin:8px 0;}
+.prog-lbl{display:flex;justify-content:space-between;font-family:'JetBrains Mono',monospace;font-size:0.55rem;color:var(--dim2);margin-bottom:5px;}
+.prog-track{height:4px;background:var(--border);border-radius:2px;position:relative;overflow:hidden;}
+.prog-fill{height:100%;transition:width .8s ease;border-radius:2px;}
+.prog-b{background:var(--white);}
+.prog-w{background:var(--warn);}
+.prog-g{background:var(--green);}
+.prog-t{background:var(--teal);}
+
+/* Toast */
+#toast{
+  position:fixed;bottom:28px;left:50%;transform:translateX(-50%);
+  background:#111;border:1px solid var(--border2);
+  padding:11px 24px;font-family:'JetBrains Mono',monospace;font-size:0.76rem;
+  color:var(--white);z-index:9999;box-shadow:0 0 40px rgba(0,0,0,0.8);
+  pointer-events:none;opacity:0;transition:opacity .2s;white-space:nowrap;border-radius:2px;
+}
+#toast.show{opacity:1;}
+
+/* Modal */
+.modal-bg{position:fixed;inset:0;background:rgba(0,0,0,.92);z-index:800;display:none;align-items:center;justify-content:center;}
+.modal-bg.open{display:flex;animation:fadeIn .2s ease;}
+.modal-box{
+  background:#0d0d0d;border:1px solid var(--border2);border-radius:3px;
+  width:min(500px,94vw);max-height:88vh;overflow-y:auto;
+  box-shadow:0 0 60px rgba(0,0,0,0.9);
+}
+.modal-head{
+  display:flex;align-items:center;justify-content:space-between;
+  padding:15px 20px;border-bottom:1px solid var(--border2);
+  font-family:'Oswald',sans-serif;font-size:1rem;font-weight:500;color:var(--white);letter-spacing:3px;
+}
+.modal-close{background:transparent;border:none;color:var(--dim2);cursor:pointer;font-size:1.1rem;transition:color .2s;}
+.modal-close:hover{color:var(--white);}
+.modal-body{padding:20px;}
+@keyframes fadeIn{from{opacity:0}to{opacity:1}}
+
+
+/* ══════════════════════════════════════════
+   SPLASH
+══════════════════════════════════════════ */
+#s-splash{display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:100%;text-align:center;padding:40px 20px;}
+.splash-logo{
+  font-family:'Oswald',sans-serif;
+  font-size:clamp(2.8rem,7vw,5.5rem);font-weight:700;color:var(--white);letter-spacing:12px;
+  text-shadow:0 0 80px rgba(255,255,255,0.08);margin-bottom:4px;
+}
+.splash-logo span{color:var(--teal);}
+.splash-acronym{
+  font-family:'JetBrains Mono',monospace;font-size:0.62rem;color:var(--dim2);
+  letter-spacing:2px;margin-bottom:10px;
+}
+.splash-headline{
+  font-size:1rem;font-weight:600;color:var(--text);margin-bottom:6px;max-width:540px;line-height:1.6;
+}
+.splash-tag{font-family:'JetBrains Mono',monospace;font-size:0.64rem;color:var(--dim2);letter-spacing:3px;margin-bottom:44px;}
+.splash-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:1px;max-width:680px;width:100%;margin-bottom:36px;background:var(--border2);}
+.sc{
+  border:none;padding:28px 18px;text-align:center;
+  background:var(--panel);cursor:pointer;transition:all .25s;
+}
+.sc:hover{background:var(--card);transform:translateY(-2px);}
+.sc-ico{font-size:2rem;margin-bottom:12px;}
+.sc-ttl{font-family:'Syne',sans-serif;font-weight:700;font-size:0.7rem;color:var(--white);letter-spacing:2px;margin-bottom:8px;text-transform:uppercase;}
+.sc-desc{font-size:0.8rem;color:var(--dim2);line-height:1.6;}
+.splash-sub{margin-top:14px;font-family:'JetBrains Mono',monospace;font-size:0.62rem;color:var(--dim2);}
+.splash-sub a{color:var(--white);cursor:pointer;}
+
+
+/* ══════════════════════════════════════════
+   VERIFY — Citizen Identity
+══════════════════════════════════════════ */
+.verify-steps{display:flex;border:1px solid var(--border2);margin-bottom:22px;overflow:hidden;border-radius:2px;}
+.verify-st{
+  flex:1;padding:13px 8px;text-align:center;
+  font-family:'JetBrains Mono',monospace;font-size:0.5rem;letter-spacing:1px;
+  color:var(--dim2);border-right:1px solid var(--border2);transition:all .3s;
+}
+.verify-st:last-child{border-right:none;}
+.verify-st .sn{display:block;font-family:'Oswald',sans-serif;font-size:1rem;font-weight:400;letter-spacing:1px;margin-bottom:3px;}
+.verify-st.done{color:var(--green);}
+.verify-st.done .sn{color:var(--green);}
+.verify-st.active{color:var(--white);background:rgba(255,255,255,.04);border-bottom:1px solid var(--white);}
+.verify-st.active .sn{color:var(--white);}
+.verify-panel{background:var(--panel);border:1px solid var(--border2);padding:24px;margin-bottom:14px;border-radius:3px;}
+
+/* Citizen ID card visual */
+.id-card{
+  background:linear-gradient(135deg,#080808,#111111);
+  border:1px solid #2a2a2a;padding:22px;max-width:400px;
+  margin:0 auto 22px;position:relative;overflow:hidden;border-radius:4px;
+}
+.id-card::before{
+  content:'';position:absolute;top:-60px;right:-60px;width:160px;height:160px;
+  border-radius:50%;background:radial-gradient(circle,rgba(255,255,255,.03),transparent);
+}
+.id-card-top{display:flex;align-items:center;gap:12px;margin-bottom:18px;}
+.id-card-emb{
+  width:44px;height:44px;border-radius:50%;flex-shrink:0;
+  background:var(--border2);
+  display:flex;align-items:center;justify-content:center;font-size:1.2rem;
+  border:1px solid var(--border2);
+}
+.id-card-title{font-family:'Syne',sans-serif;font-weight:700;font-size:0.58rem;color:var(--white);letter-spacing:2px;}
+.id-card-sub{font-size:0.52rem;color:var(--dim2);margin-top:2px;}
+.id-card-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;}
+.id-card-grid .full{grid-column:1/-1;}
+.id-card-id{
+  margin-top:14px;padding:11px;background:rgba(0,0,0,.7);
+  border:1px solid var(--border2);font-family:'JetBrains Mono',monospace;
+  font-size:0.85rem;letter-spacing:5px;color:var(--white);text-align:center;border-radius:2px;
+}
+.otp-row{display:flex;gap:8px;justify-content:center;margin:18px 0;}
+.otp-b{
+  width:48px;height:58px;background:var(--bg2);border:1px solid var(--border2);
+  font-family:'Oswald',sans-serif;font-size:1.6rem;letter-spacing:0px;
+  color:var(--white);text-align:center;outline:none;transition:border-color .2s;border-radius:2px;
+}
+.otp-b:focus{border-color:var(--white);}
+.v-wrap{display:flex;flex-direction:column;align-items:center;padding:32px;text-align:center;}
+.v-ring{
+  width:100px;height:100px;border-radius:50%;border:1px solid var(--teal);
+  background:rgba(0,255,204,.04);display:flex;align-items:center;justify-content:center;
+  font-size:2.5rem;margin-bottom:20px;animation:vp 2s ease-in-out infinite;
+  box-shadow:0 0 40px rgba(0,255,204,0.1);
+}
+@keyframes vp{0%,100%{box-shadow:0 0 40px rgba(0,255,204,.1)}50%{box-shadow:0 0 70px rgba(0,255,204,.25)}}
+.v-ttl{font-family:'Oswald',sans-serif;font-size:1.4rem;font-weight:500;letter-spacing:4px;color:var(--teal);margin-bottom:8px;}
+.v-hash{margin-top:12px;padding:7px 14px;background:#000;border:1px solid var(--border2);font-family:'JetBrains Mono',monospace;font-size:0.58rem;color:var(--dim2);border-radius:2px;}
+
+/* Proof bar */
+.proof-bar-wrap{background:var(--bg2);border:1px solid var(--border2);padding:16px;border-radius:2px;margin:14px 0;}
+.proof-bar-lbl{display:flex;justify-content:space-between;font-family:'JetBrains Mono',monospace;font-size:0.55rem;color:var(--dim2);margin-bottom:8px;}
+.proof-bar{height:6px;background:var(--border);border-radius:2px;overflow:hidden;}
+.proof-bar-fill{height:100%;width:0%;background:var(--white);transition:width .4s ease;border-radius:2px;}
+
+
+/* ══════════════════════════════════════════
+   MAP
+══════════════════════════════════════════ */
+#s-map{padding:0;overflow:hidden;}
+.map-layout{display:grid;grid-template-columns:1fr 320px;height:100%;}
+.map-area{position:relative;background:#000;overflow:hidden;}
+.map-area::before{
+  content:'';position:absolute;inset:0;
+  background-image:
+    linear-gradient(rgba(255,255,255,.02) 1px,transparent 1px),
+    linear-gradient(90deg,rgba(255,255,255,.02) 1px,transparent 1px);
+  background-size:48px 48px;
+}
+.map-road{position:absolute;background:rgba(255,255,255,.02);}
+.map-road.h{left:0;right:0;height:22px;}
+.map-road.v{top:0;bottom:0;width:22px;}
+
+.district-zone{position:absolute;border:1px solid rgba(255,255,255,.04);display:flex;align-items:flex-start;justify-content:flex-start;padding:8px;}
+.dz-lbl{font-family:'JetBrains Mono',monospace;font-size:0.48rem;color:rgba(255,255,255,.2);letter-spacing:2px;text-transform:uppercase;}
+.dz-north{top:2%;left:22%;width:42%;height:22%;}
+.dz-central{top:26%;left:22%;width:42%;height:26%;}
+.dz-south{top:54%;left:22%;width:42%;height:24%;}
+.dz-east{top:2%;left:70%;width:28%;height:60%;}
+.dz-west{top:2%;left:2%;width:18%;height:60%;}
+
+.map-topbar{
+  position:absolute;top:12px;left:12px;right:12px;
+  display:flex;gap:8px;align-items:center;z-index:10;flex-wrap:wrap;
+}
+.map-search{
+  flex:1;min-width:160px;display:flex;align-items:center;
+  background:rgba(0,0,0,.96);border:1px solid var(--border2);
+  padding:0 12px;gap:8px;backdrop-filter:blur(8px);border-radius:2px;
+}
+.map-search input{
+  flex:1;background:transparent;border:none;color:var(--white);
+  font-family:'JetBrains Mono',monospace;font-size:0.78rem;outline:none;padding:8px 0;
+}
+.map-search input::placeholder{color:var(--dim2);}
+
+/* Heatmap legend overlay */
+.heatmap-legend{
+  position:absolute;bottom:12px;left:12px;
+  background:rgba(0,0,0,.95);border:1px solid var(--border2);
+  padding:10px 14px;font-family:'JetBrains Mono',monospace;font-size:0.52rem;color:var(--dim2);
+  backdrop-filter:blur(8px);border-radius:2px;
+}
+.heatmap-legend .hl-title{color:var(--white);font-weight:500;margin-bottom:6px;letter-spacing:1.5px;}
+.hl-row{display:flex;align-items:center;gap:7px;margin-bottom:3px;}
+.hl-dot{width:8px;height:8px;border-radius:50%;}
+
+/* Zone markers */
+.rz{position:absolute;cursor:pointer;z-index:5;transform:translate(-50%,-50%);}
+.rz-ring{
+  width:22px;height:22px;border-radius:50%;border:1px solid;
+  position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);
+  animation:rzpulse 2s ease-in-out infinite;
+}
+.rz-dot{width:8px;height:8px;border-radius:50%;position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);}
+.rz-info{
+  position:absolute;top:16px;left:50%;transform:translateX(-50%);
+  white-space:nowrap;font-family:'JetBrains Mono',monospace;font-size:0.46rem;
+  letter-spacing:1px;padding:2px 6px;border-radius:1px;color:var(--white);
+  background:rgba(0,0,0,.95);border:1px solid var(--border2);
+  pointer-events:none;
+}
+.rz.active .rz-ring{border-color:var(--status-w);}
+.rz.active .rz-dot{background:var(--status-w);}
+.rz.critical .rz-ring{border-color:var(--status-r);}
+.rz.critical .rz-dot{background:var(--status-r);}
+.rz.resolved .rz-ring{border-color:var(--status-g);}
+.rz.resolved .rz-dot{background:var(--status-g);}
+@keyframes rzpulse{0%,100%{transform:translate(-50%,-50%) scale(1);opacity:.6}50%{transform:translate(-50%,-50%) scale(1.6);opacity:.15}}
+
+/* Map popup */
+#mapPopup{
+  position:absolute;z-index:20;background:#0d0d0d;
+  border:1px solid var(--border2);width:220px;
+  pointer-events:all;display:none;border-radius:3px;
+  box-shadow:0 8px 40px rgba(0,0,0,0.9);
+}
+#mapPopup.open{display:block;animation:fadeIn .15s ease;}
+.mp-head{padding:12px 14px;border-bottom:1px solid var(--border2);}
+.mp-ttl{font-family:'Syne',sans-serif;font-weight:700;font-size:0.82rem;margin-bottom:3px;}
+.mp-loc{font-family:'JetBrains Mono',monospace;font-size:0.52rem;color:var(--dim2);}
+.mp-body{padding:12px 14px;}
+.mp-stat{display:flex;justify-content:space-between;font-family:'JetBrains Mono',monospace;font-size:0.58rem;color:var(--dim2);margin-bottom:5px;}
+.mp-stat strong{color:var(--white);}
+/* Workflow status */
+.mp-workflow{display:flex;gap:3px;margin:10px 0;}
+.wf-step{flex:1;padding:4px 2px;text-align:center;font-family:'JetBrains Mono',monospace;font-size:0.38rem;letter-spacing:0.5px;border:1px solid var(--border);color:var(--dim);border-radius:1px;}
+.wf-step.done{border-color:var(--green);color:var(--green);background:rgba(57,255,122,.04);}
+.wf-step.cur{border-color:var(--white);color:var(--white);background:rgba(255,255,255,.05);}
+.mp-btns{display:flex;gap:6px;margin-top:10px;}
+.mp-btn{
+  flex:1;padding:7px;background:transparent;border:1px solid var(--border2);
+  color:var(--dim2);font-family:'Syne',sans-serif;font-size:0.62rem;font-weight:600;
+  cursor:pointer;transition:all .18s;border-radius:2px;
+}
+.mp-btn:hover,.mp-btn.b{border-color:var(--white);color:var(--white);}
+
+/* Map sidebar */
+.map-sidebar{
+  border-left:1px solid var(--border2);display:flex;flex-direction:column;
+  background:rgba(0,0,0,.98);
+}
+.sidebar-head{
+  padding:14px 16px;border-bottom:1px solid var(--border2);
+  font-family:'Syne',sans-serif;font-weight:700;font-size:0.78rem;
+  color:var(--white);letter-spacing:2px;display:flex;align-items:center;justify-content:space-between;
+}
+.raid-list{flex:1;overflow-y:auto;padding:8px;}
+.rc{
+  border:1px solid var(--border2);padding:12px;margin-bottom:8px;
+  cursor:pointer;transition:all .18s;border-radius:2px;
+}
+.rc:hover{border-color:var(--dim2);background:rgba(255,255,255,.02);}
+.rc-head{display:flex;gap:10px;align-items:flex-start;margin-bottom:8px;}
+.rc-ico{font-size:1.2rem;flex-shrink:0;}
+.rc-name{font-weight:700;font-size:0.82rem;margin-bottom:2px;}
+.rc-loc{font-family:'JetBrains Mono',monospace;font-size:0.52rem;color:var(--dim2);}
+.rc-meta{display:flex;justify-content:space-between;font-family:'JetBrains Mono',monospace;font-size:0.54rem;color:var(--dim2);margin-bottom:5px;}
+.rc-bar{height:2px;background:var(--border);border-radius:1px;}
+.rc-fill{height:100%;border-radius:1px;}
+
+/* Workflow badge in sidebar */
+.rc-wf{display:flex;gap:2px;margin-top:6px;}
+.rc-wf-step{flex:1;height:2px;border-radius:1px;background:var(--border);}
+.rc-wf-step.done{background:var(--green);}
+.rc-wf-step.cur{background:var(--white);}
+
+
+/* ══════════════════════════════════════════
+   LEAFLET MAP OVERRIDES
+══════════════════════════════════════════ */
+#leafletMap{
+  position:absolute;inset:0;z-index:1;
+}
+.leaflet-container{
+  background:#000!important;
+  font-family:'JetBrains Mono',monospace!important;
+}
+.leaflet-popup-content-wrapper,
+.leaflet-popup-tip{
+  background:#0d0d0d!important;
+  border:1px solid #2a2a2a!important;
+  border-radius:3px!important;
+  box-shadow:0 0 30px rgba(0,0,0,.9)!important;
+  color:#888!important;
+}
+.cg-popup{font-family:'JetBrains Mono',monospace;font-size:11px;padding:4px;min-width:200px;}
+.cg-popup h4{
+  font-family:'Syne',sans-serif;font-size:13px;font-weight:700;
+  color:#fff;margin-bottom:5px;letter-spacing:.5px;
+}
+.cg-popup .cp-row{display:flex;justify-content:space-between;margin-bottom:3px;font-size:10px;}
+.cg-popup .cp-label{color:#555;}
+.cg-popup .cp-val{color:#aaa;}
+.cg-popup .cp-val.red{color:#ff3344;}
+.cg-popup .cp-val.warn{color:#ffcc00;}
+.cg-popup .cp-val.teal{color:#00ffcc;}
+.cg-popup .cp-val.green{color:#39ff7a;}
+.cg-popup .cp-btn{
+  width:100%;margin-top:10px;padding:7px;
+  background:transparent;border:1px solid #2a2a2a;
+  color:#aaa;font-family:'Syne',sans-serif;font-size:11px;font-weight:600;
+  cursor:pointer;transition:all .18s;letter-spacing:1px;
+  border-radius:2px;
+}
+.cg-popup .cp-btn:hover{border-color:#fff;color:#fff;background:rgba(255,255,255,.04);}
+.cg-popup .cp-btn.primary{border-color:#fff;color:#fff;}
+.leaflet-control-zoom a{
+  background:#0d0d0d!important;border-color:#2a2a2a!important;color:#888!important;
+}
+.leaflet-control-zoom a:hover{color:#fff!important;background:#111!important;}
+.leaflet-control-attribution{
+  background:rgba(0,0,0,.8)!important;color:#333!important;font-size:9px!important;
+}
+.leaflet-control-attribution a{color:#555!important;}
+
+/* ══════════════════════════════════════════
+   SCAN
+══════════════════════════════════════════ */
+.scan-tabs{display:flex;margin-bottom:16px;border:1px solid var(--border2);border-radius:2px;overflow:hidden;}
+.scan-tab{
+  flex:1;padding:10px;background:transparent;border:none;color:var(--dim2);
+  font-family:'Syne',sans-serif;font-weight:600;font-size:0.72rem;
+  cursor:pointer;transition:all .2s;
+}
+.scan-tab.active{background:rgba(255,255,255,.06);color:var(--white);}
+.scan-tab:hover:not(.active){color:var(--text);}
+.camera-view{
+  width:100%;aspect-ratio:16/9;position:relative;background:#000;
+  border:1px solid var(--border2);overflow:hidden;margin-bottom:12px;border-radius:3px;
+}
+.cam-feed{width:100%;height:100%;object-fit:cover;display:none;}
+.cam-placeholder{
+  position:absolute;inset:0;display:flex;flex-direction:column;
+  align-items:center;justify-content:center;gap:10px;
+  font-family:'JetBrains Mono',monospace;font-size:0.66rem;color:var(--dim2);letter-spacing:2px;
+}
+.cam-ico{font-size:2.5rem;opacity:.3;}
+.cam-corner{position:absolute;width:16px;height:16px;border-color:var(--white);border-style:solid;opacity:.25;}
+.cam-corner.tl{top:10px;left:10px;border-width:1px 0 0 1px;}
+.cam-corner.tr{top:10px;right:10px;border-width:1px 1px 0 0;}
+.cam-corner.bl{bottom:10px;left:10px;border-width:0 0 1px 1px;}
+.cam-corner.br{bottom:10px;right:10px;border-width:0 1px 1px 0;}
+.cam-scan-line{
+  position:absolute;left:0;right:0;height:1px;
+  background:linear-gradient(90deg,transparent,var(--teal),transparent);
+  top:-4px;animation:scan 2s ease-in-out infinite;opacity:0;
+}
+.cam-scan-line.scanning{opacity:1;}
+@keyframes scan{0%{top:-4px}100%{top:100%}}
+.cam-chips{position:absolute;top:8px;left:8px;display:flex;flex-direction:column;gap:4px;}
+.cam-chip{font-family:'JetBrains Mono',monospace;font-size:0.48rem;color:var(--teal);letter-spacing:1px;animation:fadeIn .3s ease;}
+.cam-hud{
+  position:absolute;bottom:8px;right:8px;
+  font-family:'JetBrains Mono',monospace;font-size:0.5rem;color:var(--dim2);
+  text-align:right;line-height:1.8;
+}
+.cam-gps{position:absolute;bottom:8px;left:8px;font-family:'JetBrains Mono',monospace;font-size:0.48rem;color:rgba(0,255,204,.5);}
+
+/* AR severity overlay */
+.ar-overlay{
+  position:absolute;inset:0;pointer-events:none;
+  display:flex;align-items:flex-start;justify-content:flex-start;padding:10px;
+}
+.ar-tag{
+  font-family:'JetBrains Mono',monospace;font-size:0.5rem;letter-spacing:1px;
+  padding:3px 8px;border:1px solid var(--teal);color:var(--teal);
+  background:rgba(0,255,204,.05);margin:2px;border-radius:1px;
+  display:inline-block;
+}
+.ar-tag.sev-high{border-color:var(--status-r);color:var(--status-r);background:rgba(255,51,68,.06);}
+.ar-tag.sev-med{border-color:var(--warn);color:var(--warn);background:rgba(255,204,0,.06);}
+.ar-tag.sev-low{border-color:var(--green);color:var(--green);background:rgba(57,255,122,.06);}
+
+.upload-zone{
+  border:1px dashed var(--border2);padding:40px 20px;text-align:center;
+  cursor:pointer;transition:all .2s;position:relative;border-radius:3px;
+}
+.upload-zone:hover,.upload-zone.dragover{border-color:var(--white);background:rgba(255,255,255,.02);}
+.upload-msg{font-family:'Syne',sans-serif;font-size:0.82rem;font-weight:600;color:var(--dim2);letter-spacing:1px;margin:8px 0;}
+.upload-sub{font-family:'JetBrains Mono',monospace;font-size:0.57rem;color:var(--dim);letter-spacing:1px;}
+.upload-zone input[type=file]{position:absolute;inset:0;opacity:0;cursor:pointer;width:100%;height:100%;}
+.upload-preview{width:100%;aspect-ratio:16/9;position:relative;background:#000;border:1px solid var(--border2);overflow:hidden;margin-bottom:16px;display:none;border-radius:3px;}
+.upload-preview img{width:100%;height:100%;object-fit:contain;display:block;}
+
+/* Scan AI result */
+.scan-result{border:1px solid var(--border2);padding:16px;margin-bottom:16px;background:var(--panel);display:none;border-radius:2px;}
+.scan-result.show{display:block;animation:fadeIn .3s ease;}
+.sr-title{font-family:'Syne',sans-serif;font-weight:700;font-size:0.82rem;color:var(--white);margin-bottom:12px;}
+.sr-tags{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px;}
+.sr-ai{font-family:'JetBrains Mono',monospace;font-size:0.62rem;color:var(--dim2);line-height:1.9;}
+.sr-ai strong{color:var(--green);}
+
+/* Trust badge */
+.trust-indicator{display:flex;align-items:center;gap:10px;padding:10px 14px;background:rgba(57,255,122,.03);border:1px solid rgba(57,255,122,.15);border-radius:2px;margin-bottom:14px;}
+.trust-score{font-family:'Oswald',sans-serif;font-size:1.4rem;font-weight:600;color:var(--green);letter-spacing:2px;}
+.trust-label{font-family:'JetBrains Mono',monospace;font-size:0.54rem;color:var(--dim2);}
+.trust-label strong{color:var(--green);display:block;font-size:0.58rem;letter-spacing:1px;}
+
+/* Form */
+.form-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:18px;}
+.form-grid .full{grid-column:1/-1;}
+.sev-row{display:flex;gap:6px;}
+.sev-btn{
+  flex:1;padding:9px;background:transparent;cursor:pointer;
+  font-family:'Syne',sans-serif;font-weight:600;font-size:0.62rem;
+  letter-spacing:1px;transition:all .2s;border:1px solid var(--border2);color:var(--dim2);border-radius:2px;
+}
+.sev-btn.low{border-color:var(--green);color:var(--green);background:rgba(57,255,122,.04);}
+.sev-btn.med{border-color:var(--warn);color:var(--warn);background:rgba(255,204,0,.04);}
+.sev-btn.high{border-color:var(--status-r);color:var(--status-r);background:rgba(255,51,68,.04);}
+.submit-row{display:flex;gap:10px;}
+
+/* Workflow status bar */
+.workflow-bar{display:flex;margin-bottom:18px;gap:0;}
+.wfb-step{
+  flex:1;padding:10px 6px;text-align:center;border:1px solid var(--border2);
+  font-family:'JetBrains Mono',monospace;font-size:0.48rem;letter-spacing:1px;color:var(--dim2);
+  border-right:none;transition:all .2s;
+}
+.wfb-step:last-child{border-right:1px solid var(--border2);}
+.wfb-step .wsn{display:block;font-size:0.72rem;margin-bottom:2px;}
+.wfb-step.done{color:var(--green);border-color:rgba(57,255,122,.2);background:rgba(57,255,122,.03);}
+.wfb-step.cur{color:var(--white);border-color:var(--white);background:rgba(255,255,255,.04);}
+
+
+/* ══════════════════════════════════════════
+   ESCALATION
+══════════════════════════════════════════ */
+.esc-hero{
+  border:1px solid var(--border2);background:var(--panel);
+  padding:22px;margin-bottom:16px;position:relative;overflow:hidden;border-radius:3px;
+}
+.esc-hero::before{
+  content:'';position:absolute;top:0;left:0;right:0;height:1px;
+  background:linear-gradient(90deg,transparent,rgba(255,255,255,0.15),transparent);
+  animation:sh 3s ease-in-out infinite;
+}
+@keyframes sh{0%,100%{opacity:.3}50%{opacity:1}}
+.eh-top{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:18px;}
+.eh-issue{font-family:'Syne',sans-serif;font-weight:700;font-size:1.1rem;color:var(--white);margin-bottom:5px;}
+.eh-loc{font-family:'JetBrains Mono',monospace;font-size:0.63rem;color:var(--dim2);}
+.eh-timer{text-align:right;}
+.eh-days{font-family:'Oswald',sans-serif;font-size:2.8rem;font-weight:700;color:var(--warn);line-height:1;text-shadow:0 0 20px rgba(255,204,0,0.2);}
+.eh-dlbl{font-family:'JetBrains Mono',monospace;font-size:0.54rem;color:var(--dim2);}
+.voters-row{display:flex;align-items:center;gap:5px;flex-wrap:wrap;margin-bottom:16px;}
+.voter-av{width:30px;height:30px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:0.8rem;border:1px solid var(--border2);background:var(--card);cursor:pointer;transition:transform .2s;}
+.voter-av:hover{transform:scale(1.15);}
+.voter-av.me{border-color:var(--white);}
+.esc-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:1px;background:var(--border2);margin-bottom:16px;border-radius:2px;overflow:hidden;}
+.eg-cell{background:var(--card);padding:14px 12px;text-align:center;}
+.eg-lbl{font-family:'JetBrains Mono',monospace;font-size:0.5rem;color:var(--dim2);letter-spacing:1px;margin-bottom:6px;}
+.eg-val{font-family:'Oswald',sans-serif;font-size:1.5rem;font-weight:400;letter-spacing:1px;}
+
+/* Escalation actions */
+.esc-actions{border:1px solid var(--border2);padding:20px;border-radius:2px;margin-top:14px;}
+.esc-action-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:10px;margin-top:12px;}
+.ea-btn{
+  padding:14px;background:var(--bg2);border:1px solid var(--border2);
+  cursor:pointer;transition:all .2s;border-radius:2px;text-align:center;
+}
+.ea-btn:hover{border-color:var(--white);background:rgba(255,255,255,.03);}
+.ea-ico{font-size:1.4rem;margin-bottom:6px;}
+.ea-ttl{font-family:'Syne',sans-serif;font-weight:700;font-size:0.7rem;color:var(--white);margin-bottom:3px;}
+.ea-desc{font-family:'JetBrains Mono',monospace;font-size:0.54rem;color:var(--dim2);}
+
+/* Leaderboard */
+.slb-row{
+  display:flex;align-items:center;gap:12px;padding:10px 14px;
+  border-bottom:1px solid var(--border);font-family:'JetBrains Mono',monospace;font-size:0.62rem;
+  transition:background .15s;cursor:default;
+}
+.slb-row:hover{background:rgba(255,255,255,.02);}
+.slb-rank{width:28px;font-family:'Oswald',sans-serif;font-size:0.85rem;flex-shrink:0;text-align:center;}
+.slb-rank.gold{color:var(--gold);}
+.slb-rank.silver{color:#aaaaaa;}
+.slb-rank.bronze{color:#cc8844;}
+.slb-name{flex:1;color:var(--text);}
+.slb-name.me{color:var(--white);}
+.slb-badge{font-size:0.85rem;}
+.slb-xp{color:var(--white);width:70px;text-align:right;font-weight:600;}
+
+
+/* ══════════════════════════════════════════
+   DASHBOARD
+══════════════════════════════════════════ */
+.dash-stats{display:grid;grid-template-columns:repeat(3,1fr);gap:1px;background:var(--border2);margin-bottom:22px;border-radius:2px;overflow:hidden;}
+.ds-cell{background:var(--panel);padding:20px;text-align:center;}
+.ds-lbl{font-family:'JetBrains Mono',monospace;font-size:0.52rem;color:var(--dim2);letter-spacing:2px;margin-bottom:8px;}
+.ds-val{font-family:'Oswald',sans-serif;font-size:1.8rem;font-weight:500;letter-spacing:2px;}
+.dash-table{width:100%;border-collapse:collapse;}
+.dash-table th{font-family:'JetBrains Mono',monospace;font-size:0.5rem;color:var(--dim2);letter-spacing:2px;text-align:left;padding:9px 12px;border-bottom:1px solid var(--border2);}
+.dash-table td{padding:12px;border-bottom:1px solid var(--border);font-size:0.82rem;vertical-align:middle;cursor:pointer;}
+.dash-table tr:hover td{background:rgba(255,255,255,.02);}
+.off-name{font-weight:700;}
+.off-hash{font-family:'JetBrains Mono',monospace;font-size:0.52rem;color:var(--dim2);}
+.lat-wrap{display:flex;align-items:center;gap:8px;}
+.lat-bar{flex:1;height:3px;background:var(--border);border-radius:1px;}
+.lat-fill{height:100%;border-radius:1px;}
+.sp{font-family:'JetBrains Mono',monospace;font-size:0.5rem;padding:2px 7px;border:1px solid;display:inline-block;border-radius:1px;}
+.sp-r{border-color:var(--status-r);color:var(--status-r);background:rgba(255,51,68,.05);}
+.sp-w{border-color:var(--warn);color:var(--warn);background:rgba(255,204,0,.05);}
+.sp-g{border-color:var(--green);color:var(--green);background:rgba(57,255,122,.05);}
+.sp-b{border-color:var(--white);color:var(--white);background:rgba(255,255,255,.04);}
+
+/* Moderation panel */
+.mod-panel{
+  display:grid;grid-template-columns:repeat(3,1fr);gap:1px;margin-bottom:22px;background:var(--border2);
+}
+.mod-card{
+  background:var(--card);padding:16px;text-align:center;
+}
+.mod-ico{font-size:1.6rem;margin-bottom:8px;}
+.mod-ttl{font-family:'Syne',sans-serif;font-weight:700;font-size:0.72rem;color:var(--white);margin-bottom:4px;letter-spacing:1px;}
+.mod-val{font-family:'Oswald',sans-serif;font-size:1.6rem;font-weight:500;letter-spacing:1px;margin-bottom:4px;}
+.mod-desc{font-family:'JetBrains Mono',monospace;font-size:0.54rem;color:var(--dim2);}
+
+
+/* ══════════════════════════════════════════
+   REWARDS
+══════════════════════════════════════════ */
+.player-banner{
+  display:flex;gap:20px;align-items:center;
+  border:1px solid var(--border2);background:var(--panel);
+  padding:22px;margin-bottom:20px;flex-wrap:wrap;border-radius:3px;
+}
+.rank-box{
+  width:76px;height:76px;border:1px solid var(--white);border-radius:2px;
+  display:flex;flex-direction:column;align-items:center;justify-content:center;
+  flex-shrink:0;box-shadow:0 0 20px rgba(255,255,255,0.06);
+}
+.rank-lbl{font-family:'JetBrains Mono',monospace;font-size:0.44rem;color:var(--dim2);letter-spacing:1px;}
+.rank-num{font-family:'Oswald',sans-serif;font-size:2rem;font-weight:600;color:var(--white);line-height:1;}
+.pl-name{font-family:'Syne',sans-serif;font-weight:700;font-size:1.1rem;margin-bottom:6px;}
+.pl-stats{display:flex;gap:18px;flex-wrap:wrap;}
+.pl-stat{font-family:'JetBrains Mono',monospace;font-size:0.62rem;color:var(--dim2);}
+.pl-stat strong{color:var(--white);}
+.civic-pts{
+  width:62px;height:62px;border-radius:50%;background:var(--card);
+  border:1px solid var(--border2);display:flex;flex-direction:column;
+  align-items:center;justify-content:center;
+  box-shadow:0 0 20px rgba(255,255,255,0.04);animation:mb 3s ease-in-out infinite;
+}
+@keyframes mb{0%,100%{box-shadow:0 0 20px rgba(255,255,255,.04)}50%{box-shadow:0 0 40px rgba(255,255,255,.09)}}
+.civic-num{font-family:'Oswald',sans-serif;font-size:1rem;color:var(--white);}
+.civic-lbl{font-family:'JetBrains Mono',monospace;font-size:0.38rem;color:var(--dim2);}
+.xp-block{border:1px solid var(--border2);background:var(--panel);padding:14px;margin-bottom:20px;border-radius:2px;}
+.xp-meta{display:flex;justify-content:space-between;font-family:'JetBrains Mono',monospace;font-size:0.55rem;color:var(--dim2);margin-bottom:5px;}
+.xp-bar2{height:8px;background:var(--border);overflow:hidden;border-radius:2px;}
+.xp-bar2-fill{height:100%;width:62%;background:var(--white);border-radius:2px;}
+.rewards-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:22px;}
+.rw-card{
+  border:1px solid var(--border2);background:var(--card);
+  padding:18px;text-align:center;cursor:pointer;transition:all .25s;position:relative;border-radius:2px;
+}
+.rw-card:hover:not(.locked){border-color:var(--white);transform:translateY(-2px);}
+.rw-card.locked{opacity:.35;cursor:not-allowed;}
+.rw-ico{font-size:1.9rem;margin-bottom:9px;}
+.rw-name{font-family:'Syne',sans-serif;font-weight:700;font-size:0.64rem;color:var(--white);letter-spacing:1px;margin-bottom:6px;text-transform:uppercase;}
+.rw-desc{font-size:0.76rem;color:var(--dim2);line-height:1.55;margin-bottom:10px;}
+.rw-cost{font-family:'JetBrains Mono',monospace;font-size:0.6rem;padding:3px 8px;border:1px solid var(--border2);color:var(--dim2);display:inline-block;border-radius:1px;}
+.lock-over{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,.6);font-size:1.5rem;border-radius:2px;}
+.ach-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;}
+.ach{border:1px solid var(--border2);background:var(--card);padding:14px;text-align:center;cursor:pointer;transition:all .2s;border-radius:2px;}
+.ach:hover{border-color:var(--dim2);}
+.ach.earned{border-color:var(--white);}
+.ach-ico{font-size:1.4rem;margin-bottom:6px;}
+.ach-name{font-family:'JetBrains Mono',monospace;font-size:0.5rem;color:var(--dim2);letter-spacing:1px;}
+.ach.earned .ach-name{color:var(--white);}
+
+
+/* ══════════════════════════════════════════
+   PROFILE
+══════════════════════════════════════════ */
+.profile-banner{
+  display:flex;gap:20px;align-items:center;
+  border:1px solid var(--border2);background:var(--panel);
+  padding:22px;margin-bottom:20px;flex-wrap:wrap;border-radius:3px;
+}
+.profile-pic{
+  width:70px;height:70px;border:1px solid var(--border2);border-radius:3px;
+  display:flex;align-items:center;justify-content:center;
+  font-size:2rem;background:var(--card);flex-shrink:0;
+}
+.pf-name{font-family:'Syne',sans-serif;font-weight:700;font-size:1.2rem;margin-bottom:3px;}
+.pf-handle{font-family:'JetBrains Mono',monospace;font-size:0.65rem;color:var(--dim2);}
+.pf-verified{
+  display:inline-flex;align-items:center;gap:5px;margin-top:7px;
+  font-family:'JetBrains Mono',monospace;font-size:0.55rem;
+  padding:3px 9px;border:1px solid var(--border2);color:var(--dim2);background:rgba(255,255,255,.03);border-radius:2px;
+}
+.pf-trust{
+  display:inline-flex;align-items:center;gap:8px;margin-top:7px;margin-left:8px;
+  font-family:'JetBrains Mono',monospace;font-size:0.55rem;
+  padding:3px 9px;border:1px solid var(--green);color:var(--green);background:rgba(57,255,122,.04);border-radius:2px;
+}
+.settings-block{border:1px solid var(--border2);background:var(--panel);margin-bottom:12px;overflow:hidden;border-radius:2px;}
+.sb-ttl{padding:12px 16px;border-bottom:1px solid var(--border2);font-family:'Syne',sans-serif;font-weight:700;font-size:0.72rem;color:var(--white);letter-spacing:1px;}
+.sb-body{padding:18px;}
+.setting-row{display:flex;align-items:center;justify-content:space-between;padding:9px 0;border-bottom:1px solid var(--border);}
+.setting-row:last-child{border-bottom:none;}
+.setting-info label{font-size:0.84rem;display:block;margin-bottom:2px;}
+.setting-info small{font-family:'JetBrains Mono',monospace;font-size:0.54rem;color:var(--dim2);}
+.toggle{width:38px;height:20px;background:var(--border2);border-radius:10px;position:relative;cursor:pointer;transition:background .2s;flex-shrink:0;}
+.toggle.on{background:var(--white);}
+.toggle::after{content:'';position:absolute;top:3px;left:3px;width:14px;height:14px;border-radius:50%;background:#000;transition:transform .2s;}
+.toggle.on::after{transform:translateX(18px);}
+
+/* ─── RESPONSIVE ─── */
+@media(max-width:700px){
+  .map-layout{grid-template-columns:1fr;}
+  .map-sidebar{display:none;}
+  .form-grid{grid-template-columns:1fr;}
+  .esc-grid{grid-template-columns:repeat(2,1fr);}
+  .rewards-grid{grid-template-columns:repeat(2,1fr);}
+  .ach-grid{grid-template-columns:repeat(2,1fr);}
+  .nav-tab .tl{display:none;}
+  .splash-grid{grid-template-columns:1fr;}
+  .dash-stats{grid-template-columns:1fr;}
+  .mod-panel{grid-template-columns:1fr;}
+}
+</style>
+</head>
+<body>
+
+<!-- ══════════ TOP NAV ══════════ -->
+<nav id="topNav">
+  <div class="logo" onclick="go('splash')">
+    <div>CHAOS<span>GRID</span><div class="logo-sub">CIVIC HAZARD ANALYSIS & OPTIMIZATION SYSTEM</div></div>
+  </div>
+  <div class="nav-tabs">
+    <button class="nav-tab" id="tab-map"     onclick="go('map')">    <span class="ti">🗺️</span><span class="tl">MAP</span></button>
+    <button class="nav-tab" id="tab-scan"    onclick="go('scan')">   <span class="ti">📷</span><span class="tl">DETECT</span></button>
+    <button class="nav-tab" id="tab-zkp"     onclick="go('zkp')">    <span class="ti">🛡️</span><span class="tl">VERIFY</span></button>
+    <button class="nav-tab" id="tab-siege"   onclick="go('siege')">  <span class="ti">⚡</span><span class="tl">ESCALATE</span></button>
+    <button class="nav-tab" id="tab-ledger"  onclick="go('ledger')"> <span class="ti">📊</span><span class="tl">DASHBOARD</span></button>
+    <button class="nav-tab" id="tab-rewards" onclick="go('rewards')"><span class="ti">🏆</span><span class="tl">REWARDS</span></button>
+    <button class="nav-tab" id="tab-profile" onclick="go('profile')"><span class="ti">👤</span><span class="tl">PROFILE</span></button>
+  </div>
+  <div class="nav-right">
+    <div class="nav-pill">
+      <span id="navLvl">LV7</span>
+      <div class="xp-track"><div class="xp-fill" id="navXpFill"></div></div>
+    </div>
+    <div class="notif-wrap">
+      <button class="nav-ico" onclick="openModal('notifModal')" title="Notifications">🔔<div class="notif-pip" id="notifPip"></div></button>
+    </div>
+    <button class="nav-ico ok" onclick="go('zkp')" title="Verify Status" id="zkpNavBtn">🛡️</button>
+    <button class="nav-ico" onclick="go('profile')" title="Profile">👤</button>
+  </div>
+</nav>
+
+<!-- ══════════ MAIN ══════════ -->
+<div id="appMain">
+
+<!-- ─── SPLASH ─── -->
+<div class="screen active" id="s-splash">
+  <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:calc(100vh - 56px);padding:40px 20px;text-align:center;">
+    <div class="splash-logo">CHAOS<span>GRID</span></div>
+    <div class="splash-acronym">CIVIC HAZARD ANALYSIS &amp; OPTIMIZATION SYSTEM</div>
+    <div class="splash-headline">AI-powered civic infrastructure monitoring and smart escalation — reducing urban issue response delays.</div>
+    <div class="splash-tag">// AI DETECTION · CROWD VERIFICATION · SMART ESCALATION //</div>
+    <div class="splash-grid">
+      <div class="sc" onclick="go('scan')">
+        <div class="sc-ico">📷</div>
+        <div class="sc-ttl">AI Issue Detection</div>
+        <div class="sc-desc">Camera or photo upload. AI classifies issue type, estimates severity and depth with AR overlay.</div>
+      </div>
+      <div class="sc" onclick="go('map')">
+        <div class="sc-ico">🗺️</div>
+        <div class="sc-ttl">Civic Map</div>
+        <div class="sc-desc">Live heatmap of reported issues by district. Join active escalations. Track workflow status.</div>
+      </div>
+      <div class="sc" onclick="go('zkp')">
+        <div class="sc-ico">🛡️</div>
+        <div class="sc-ttl">Crowd Verification</div>
+        <div class="sc-desc">Verify your identity with OTP. Builds trust score. Prevents fake reports and spam.</div>
+      </div>
+    </div>
+    <button class="btn btn-b" onclick="go('zkp')"><span>🛡️ VERIFY &amp; JOIN</span></button>
+    <div class="splash-sub"><br>Already verified? <a onclick="go('map')">Open the Civic Map →</a></div>
+  </div>
+</div>
+
+<!-- ─── VERIFY (was ZKP) ─── -->
+<div class="screen" id="s-zkp">
+  <div class="wrap" style="max-width:700px;">
+    <div class="pg-title">🛡️ Citizen Verification</div>
+    <div class="pg-sub">// TRUSTED IDENTITY LAYER · OTP VERIFICATION · MOCK SYSTEM //</div>
+    <div class="verify-steps">
+      <div class="verify-st active" id="zst1"><span class="sn">01</span>IDENTITY</div>
+      <div class="verify-st" id="zst2"><span class="sn">02</span>OTP</div>
+      <div class="verify-st" id="zst3"><span class="sn">03</span>TRUST SCORE</div>
+      <div class="verify-st" id="zst4"><span class="sn">04</span>VERIFIED</div>
+    </div>
+
+    <!-- Step 1 -->
+    <div id="zp1">
+      <div class="verify-panel">
+        <div class="sec-hdr"><div class="sec-ttl">CITIZEN DETAILS</div><span class="badge badge-b">DEMO SYSTEM</span></div>
+        <div class="id-card">
+          <div class="id-card-top">
+            <div class="id-card-emb">🏙️</div>
+            <div>
+              <div class="id-card-title">CHAOS GRID — CIVIC PLATFORM</div>
+              <div class="id-card-sub">Citizen Verification Portal · Demo Mode</div>
+            </div>
+          </div>
+          <div class="id-card-grid">
+            <div class="fg full"><span class="inp-lbl">FULL NAME</span><input class="inp" id="aName" placeholder="Your Name" oninput="syncState('name',this.value)"></div>
+            <div class="fg"><span class="inp-lbl">DATE OF BIRTH</span><input class="inp" id="aDOB" placeholder="DD/MM/YYYY"></div>
+            <div class="fg"><span class="inp-lbl">STATE / CITY</span><input class="inp" id="aState" placeholder="New Delhi"></div>
+            <div class="fg full"><span class="inp-lbl">MOBILE NUMBER</span><input class="inp" id="aMobile" placeholder="+91 XXXXXXXXXX" oninput="syncState('mobile',this.value)"></div>
+          </div>
+          <div class="id-card-id" id="numDisplay">CITIZEN ID — PENDING</div>
+        </div>
+        <div class="info-panel">
+          <div class="ip-b">// CHAOS GRID TRUSTED IDENTITY LAYER</div>
+          <div class="ip-d">» Your mobile number is used only for OTP verification</div>
+          <div class="ip-g">» This is a demo/mock verification system</div>
+        </div>
+        <div style="display:flex;gap:10px;margin-top:16px;">
+          <button class="btn btn-b" onclick="z1Submit()"><span>→ SEND OTP</span></button>
+          <button class="btn btn-ghost" onclick="go('splash')"><span>BACK</span></button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Step 2 -->
+    <div id="zp2" style="display:none;">
+      <div class="verify-panel">
+        <div class="sec-hdr"><div class="sec-ttl">OTP VERIFICATION</div><span class="badge badge-w">SMS SENT</span></div>
+        <p style="font-family:'DM Mono',monospace;font-size:0.68rem;color:var(--dim2);margin-bottom:4px;">OTP sent to: <span style="color:var(--white)" id="maskedMob">+91 XXXXXXXX89</span></p>
+        <div class="otp-row">
+          <input class="otp-b" maxlength="1" id="o0" oninput="oNext(this,0)">
+          <input class="otp-b" maxlength="1" id="o1" oninput="oNext(this,1)">
+          <input class="otp-b" maxlength="1" id="o2" oninput="oNext(this,2)">
+          <input class="otp-b" maxlength="1" id="o3" oninput="oNext(this,3)">
+          <input class="otp-b" maxlength="1" id="o4" oninput="oNext(this,4)">
+          <input class="otp-b" maxlength="1" id="o5" oninput="oNext(this,5)">
+        </div>
+        <p style="text-align:center;font-family:'DM Mono',monospace;font-size:0.6rem;color:var(--dim2);margin-bottom:16px;">
+          Resend in <span id="otpTimer" style="color:var(--blue2)">00:45</span> · <span style="color:var(--blue2);cursor:pointer;" onclick="toast('OTP resent!')">RESEND</span>
+        </p>
+        <div class="info-panel">
+          <div class="ip-b">// OTP VERIFICATION</div>
+          <div class="ip-d">» Enter any 6 digits for demo — OTP: 123456</div>
+        </div>
+        <div style="display:flex;gap:10px;margin-top:14px;">
+          <button class="btn btn-b" onclick="z2Submit()"><span>✓ VERIFY OTP</span></button>
+          <button class="btn btn-ghost" onclick="zGo(1)"><span>BACK</span></button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Step 3 — Trust Score -->
+    <div id="zp3" style="display:none;">
+      <div class="verify-panel">
+        <div class="sec-hdr"><div class="sec-ttl">BUILDING TRUST SCORE</div><span class="badge badge-b">AI ANALYSIS</span></div>
+        <div class="info-panel" id="tsTerm">
+          <div class="ip-b">// TRUST SCORE ENGINE v1.0</div>
+          <div class="ip-d">» Awaiting analysis...</div>
+        </div>
+        <div class="proof-bar-wrap">
+          <div class="proof-bar-lbl"><span>TRUST ANALYSIS</span><span id="zkPct">0%</span></div>
+          <div class="proof-bar"><div class="proof-bar-fill" id="zkBar"></div></div>
+        </div>
+        <button class="btn btn-b" id="zkGenBtn" onclick="runProof()"><span>▶ ANALYSE ACCOUNT</span></button>
+      </div>
+    </div>
+
+    <!-- Step 4 — Verified -->
+    <div id="zp4" style="display:none;">
+      <div class="verify-panel">
+        <div class="v-wrap">
+          <div class="v-ring">✓</div>
+          <div class="v-ttl">IDENTITY VERIFIED</div>
+          <div style="font-size:0.88rem;color:var(--dim2);line-height:2.2;margin-top:8px;">
+            Welcome, <span style="color:var(--teal)" id="vName">CITIZEN</span><br>
+            Trust Score: <span style="color:var(--green)">HIGH</span><br>
+            Status: <span style="color:var(--blue2)">ACTIVE CONTRIBUTOR</span>
+          </div>
+          <div class="v-hash" id="vHash">Citizen ID: CGRID-DEMO-0001</div>
+          <div style="display:flex;gap:10px;margin-top:22px;">
+            <button class="btn btn-b" onclick="go('map')"><span>🗺️ OPEN CIVIC MAP</span></button>
+            <button class="btn btn-ghost" onclick="go('rewards')"><span>REWARDS</span></button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ─── MAP ─── -->
+<div class="screen" id="s-map" style="padding:0;overflow:hidden;">
+  <div class="map-layout" style="height:100%;">
+    <div class="map-area" id="mapArea">
+      <!-- Real Leaflet map -->
+      <div id="leafletMap"></div>
+
+      <div class="map-topbar">
+        <div class="map-search">
+          <span style="color:var(--dim2);font-size:0.8rem;">🔍</span>
+          <input placeholder="Search district, area or issue type..." oninput="if(this.value)filterMapBySearch(this.value)">
+        </div>
+        <div style="display:flex;gap:6px;">
+          <span class="badge badge-w" style="cursor:pointer;" onclick="filterMap('active')">🟡 IN PROGRESS</span>
+          <span class="badge" style="border-color:var(--status-r);color:var(--status-r);cursor:pointer;" onclick="filterMap('critical')">🔴 CRITICAL</span>
+          <span class="badge badge-g" style="cursor:pointer;" onclick="filterMap('resolved')">🟢 RESOLVED</span>
+          <span class="badge badge-b" style="cursor:pointer;" onclick="filterMap('all')">ALL</span>
+        </div>
+      </div>
+
+      <div class="heatmap-legend">
+        <div class="hl-title">ACTIVE RAIDS MAP</div>
+        <div class="hl-row"><div class="hl-dot" style="background:var(--status-r)"></div>Critical / Unresolved</div>
+        <div class="hl-row"><div class="hl-dot" style="background:var(--warn)"></div>In Progress</div>
+        <div class="hl-row"><div class="hl-dot" style="background:var(--green)"></div>Resolved</div>
+        <div style="margin-top:6px;border-top:1px solid var(--border2);padding-top:6px;color:rgba(0,255,204,.4);font-size:0.44rem;">Click marker for raid details</div>
+      </div>
+    </div>
+
+    <div class="map-sidebar">
+      <div class="sidebar-head">ACTIVE ISSUES <span class="badge badge-t" id="liveCount">7 LIVE</span></div>
+      <div class="raid-list" id="sidebarRaidList"></div>
+    </div>
+  </div>
+</div>
+
+<!-- ─── SCAN ─── -->
+<div class="screen" id="s-scan">
+  <div class="wrap" style="max-width:700px;">
+    <div class="pg-title">📷 AI Issue Detection</div>
+    <div class="pg-sub">// YOLO DETECTION · SEVERITY ANALYSIS · AR DEPTH ESTIMATION //</div>
+
+    <div class="scan-tabs">
+      <button class="scan-tab active" id="stab-cam"    onclick="setScanTab('cam')">📷 CAMERA</button>
+      <button class="scan-tab"        id="stab-upload" onclick="setScanTab('upload')">📁 UPLOAD IMAGE</button>
+    </div>
+
+    <div id="scan-cam-panel">
+      <div class="camera-view" id="cameraView">
+        <video class="cam-feed" id="camFeed" autoplay playsinline muted></video>
+        <canvas id="camCanvas" style="display:none;position:absolute;inset:0;width:100%;height:100%;"></canvas>
+        <div class="cam-placeholder" id="camPlaceholder">
+          <div class="cam-ico">📷</div>
+          <div>CAMERA NOT STARTED</div>
+          <div style="font-size:0.55rem;opacity:.6;">Click START CAMERA below</div>
+        </div>
+        <div class="cam-corner tl"></div><div class="cam-corner tr"></div>
+        <div class="cam-corner bl"></div><div class="cam-corner br"></div>
+        <div class="cam-scan-line" id="camScanLine"></div>
+        <div class="cam-chips" id="camChips"></div>
+        <div class="cam-hud" id="camHud"></div>
+        <div class="cam-gps">LAT: 28.6139°N<br>LNG: 77.2090°E</div>
+        <div class="ar-overlay" id="arOverlay" style="display:none;"></div>
+      </div>
+      <div style="display:flex;gap:10px;margin-bottom:16px;">
+        <button class="btn btn-b" id="camStartBtn" onclick="startCamera()"><span>📷 START CAMERA</span></button>
+        <button class="btn btn-t" id="camCaptureBtn" onclick="capturePhoto()" disabled style="opacity:.4"><span>🤖 CAPTURE &amp; ANALYSE</span></button>
+        <button class="btn btn-ghost" id="camStopBtn" onclick="stopCamera()" style="display:none"><span>⏹ STOP</span></button>
+      </div>
+    </div>
+
+    <div id="scan-upload-panel" style="display:none;">
+      <div class="upload-zone" id="uploadZone" ondragover="e=>{e.preventDefault();this.classList.add('dragover')}" ondragleave="this.classList.remove('dragover')" ondrop="handleDrop(event)">
+        <div style="font-size:2rem;margin-bottom:8px;">📁</div>
+        <div class="upload-msg">DRAG &amp; DROP IMAGE HERE</div>
+        <div class="upload-sub">or click to browse · JPG, PNG, HEIC, WEBP</div>
+        <input type="file" accept="image/*" onchange="handleFileSelect(this.files)">
+      </div>
+      <div class="upload-preview" id="uploadPreview">
+        <img id="uploadImg" src="" alt="Preview">
+        <div class="cam-corner tl"></div><div class="cam-corner tr"></div>
+        <div class="cam-corner bl"></div><div class="cam-corner br"></div>
+        <div class="cam-scan-line" id="uploadScanLine"></div>
+        <div class="cam-chips" id="uploadChips"></div>
+        <div class="cam-hud" id="uploadHud"></div>
+        <div class="ar-overlay" id="uploadArOverlay" style="display:none;"></div>
+      </div>
+      <div id="uploadActionRow" style="display:none;margin-bottom:16px;">
+        <button class="btn btn-b" onclick="analyzeUpload()"><span>🤖 ANALYSE WITH AI</span></button>
+        <button class="btn btn-ghost" style="margin-left:10px;" onclick="clearUpload()"><span>✕ CLEAR</span></button>
+      </div>
+    </div>
+
+    <!-- Moderation trust indicator -->
+    <div class="trust-indicator" id="trustIndicator" style="display:none;">
+      <div class="trust-score">94%</div>
+      <div class="trust-label">
+        <strong>TRUSTED REPORT</strong>
+        No duplicate detected · Unique location · Verified citizen
+      </div>
+    </div>
+
+    <div class="scan-result" id="scanResult">
+      <div class="sr-title">🤖 AI ANALYSIS RESULT</div>
+      <div class="sr-tags" id="srTags"></div>
+      <div class="sr-ai" id="srAi"></div>
+    </div>
+
+    <div class="card" style="padding:22px;">
+      <div class="sec-hdr"><div class="sec-ttl">ISSUE DETAILS</div><span class="badge badge-b">VERIFIED REPORT</span></div>
+
+      <!-- Issue workflow tracker -->
+      <div class="workflow-bar" id="issueWorkflow">
+        <div class="wfb-step cur"><span class="wsn">📋</span>REPORTED</div>
+        <div class="wfb-step"><span class="wsn">✅</span>VERIFIED</div>
+        <div class="wfb-step"><span class="wsn">👤</span>ASSIGNED</div>
+        <div class="wfb-step"><span class="wsn">⚙️</span>IN PROGRESS</div>
+        <div class="wfb-step"><span class="wsn">🎉</span>RESOLVED</div>
+      </div>
+
+      <div class="form-grid">
+        <div class="fg">
+          <span class="inp-lbl">ISSUE TYPE</span>
+          <select class="inp" id="issueType" style="cursor:pointer;">
+            <option value="">— SELECT —</option>
+            <option>Pothole / Road Damage</option>
+            <option>Broken Streetlight</option>
+            <option>Illegal Dumping</option>
+            <option>Blocked Drain</option>
+            <option>Road Flooding</option>
+            <option>Broken Footpath</option>
+            <option>Garbage Overflow</option>
+            <option>Other Infrastructure Issue</option>
+          </select>
+        </div>
+        <div class="fg">
+          <span class="inp-lbl">SEVERITY</span>
+          <div class="sev-row">
+            <button class="sev-btn" onclick="setSev(this,'low')">LOW</button>
+            <button class="sev-btn med" onclick="setSev(this,'med')">MEDIUM</button>
+            <button class="sev-btn" onclick="setSev(this,'high')">HIGH</button>
+          </div>
+        </div>
+        <div class="fg full">
+          <span class="inp-lbl">LOCATION (GPS AUTO-DETECTED)</span>
+          <input class="inp" id="scanLoc" value="Oak Ave & 5th St, New Delhi — 110001">
+        </div>
+        <div class="fg full">
+          <span class="inp-lbl">DESCRIPTION</span>
+          <textarea class="inp" id="scanDesc" style="resize:vertical;min-height:72px;" placeholder="Describe the civic issue in detail..."></textarea>
+        </div>
+        <div class="fg">
+          <span class="inp-lbl">PRIORITY SCORE (AI)</span>
+          <input class="inp" value="Priority: HIGH — Affects 200+ daily commuters" readonly style="color:var(--warn);">
+        </div>
+        <div class="fg">
+          <span class="inp-lbl">ASSIGNED DEPARTMENT</span>
+          <input class="inp" value="Municipal Roads Division" readonly style="color:var(--blue2);">
+        </div>
+      </div>
+      <div class="submit-row">
+        <button class="btn btn-b" onclick="submitReport()"><span>📋 SUBMIT REPORT</span></button>
+        <button class="btn btn-ghost" onclick="go('zkp')"><span>🛡️ VERIFY FIRST</span></button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ─── ESCALATE (was Siege) ─── -->
+<div class="screen" id="s-siege">
+  <div class="wrap" style="max-width:940px;">
+    <div class="pg-title">⚡ Smart Escalation</div>
+    <div class="pg-sub">// AI PRIORITIZATION · CROWD VERIFICATION · DEPARTMENT ROUTING //</div>
+
+    <div class="esc-hero">
+      <div class="eh-top">
+        <div>
+          <div class="eh-issue">🕳️ Pothole — Oak Ave &amp; 5th St</div>
+          <div class="eh-loc">📍 North District, New Delhi · Municipal Roads Division</div>
+          <div style="margin-top:8px;display:flex;gap:8px;flex-wrap:wrap;">
+            <span class="badge badge-w">PRIORITY: HIGH</span>
+            <span class="badge badge-t">AI CONFIDENCE: 94%</span>
+            <span class="badge badge-g">47 VERIFICATIONS</span>
+          </div>
+        </div>
+        <div class="eh-timer">
+          <div class="eh-days" id="siegeDaysBig">11</div>
+          <div class="eh-dlbl">DAYS<br>OPEN</div>
+        </div>
+      </div>
+
+      <!-- Workflow status -->
+      <div class="workflow-bar" style="margin-bottom:12px;">
+        <div class="wfb-step done"><span class="wsn">📋</span>REPORTED</div>
+        <div class="wfb-step done"><span class="wsn">✅</span>VERIFIED</div>
+        <div class="wfb-step cur"><span class="wsn">👤</span>ASSIGNED</div>
+        <div class="wfb-step"><span class="wsn">⚙️</span>IN PROGRESS</div>
+        <div class="wfb-step"><span class="wsn">🎉</span>RESOLVED</div>
+      </div>
+
+      <div class="voters-row" id="raidersRow"></div>
+    </div>
+
+    <div class="esc-grid">
+      <div class="eg-cell"><div class="eg-lbl">VERIFIED BY</div><div class="eg-val" id="sg-raiders" style="color:var(--blue2)">47</div></div>
+      <div class="eg-cell"><div class="eg-lbl">PRIORITY SCORE</div><div class="eg-val" id="sg-docs" style="color:var(--warn)">8.4/10</div></div>
+      <div class="eg-cell"><div class="eg-lbl">EST. IMPACT</div><div class="eg-val" id="sg-sent" style="color:var(--teal)">200+</div></div>
+      <div class="eg-cell"><div class="eg-lbl">DEPT. RESPONSE</div><div class="eg-val" style="color:var(--blue2);font-size:0.9rem;padding-top:8px;"><span class="sp sp-b">ASSIGNED</span></div></div>
+    </div>
+
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-top:14px;">
+      <div class="card" style="padding:18px;">
+        <div class="sec-hdr"><div class="sec-ttl">AI ANALYSIS</div><span class="badge badge-b">YOLO DETECTION</span></div>
+        <div class="info-panel" style="font-size:0.64rem;line-height:2;">
+          <div class="ip-b">Classification: Road surface failure / pothole</div>
+          <div class="ip-d">Estimated depth: 8-12cm (AR estimation)</div>
+          <div class="ip-d">Affected area: ~0.8m²</div>
+          <div class="ip-g">Confidence: 94.2% · Severity: HIGH</div>
+          <div class="ip-d">GPS: 28.6139°N, 77.2090°E · Verified</div>
+        </div>
+      </div>
+
+      <div class="card" style="padding:18px;">
+        <div class="sec-hdr"><div class="sec-ttl">🏆 TOP CONTRIBUTORS</div><span class="badge badge-gold">THIS ISSUE</span></div>
+        <div id="siegeLb"></div>
+      </div>
+    </div>
+
+    <!-- Smart escalation actions -->
+    <div class="esc-actions">
+      <div class="sec-hdr"><div class="sec-ttl">ESCALATION OPTIONS</div><span class="badge badge-t">SMART ROUTING</span></div>
+      <div class="esc-action-grid">
+        <div class="ea-btn" onclick="toast('📧 Escalation email sent to Municipal Roads Division')">
+          <div class="ea-ico">📧</div>
+          <div class="ea-ttl">NOTIFY DEPARTMENT</div>
+          <div class="ea-desc">Send formal report to assigned department with AI evidence package</div>
+        </div>
+        <div class="ea-btn" onclick="toast('📋 RTI request filed')">
+          <div class="ea-ico">📋</div>
+          <div class="ea-ttl">FILE RTI REQUEST</div>
+          <div class="ea-desc">Right to Information request to track department response timeline</div>
+        </div>
+        <div class="ea-btn" onclick="toast('🏛️ Submitted to 311 civic portal')">
+          <div class="ea-ico">🏛️</div>
+          <div class="ea-ttl">311 CIVIC PORTAL</div>
+          <div class="ea-desc">Submit directly to the official municipal complaint portal</div>
+        </div>
+        <div class="ea-btn" onclick="toast('📢 Community alert sent to area residents')">
+          <div class="ea-ico">📢</div>
+          <div class="ea-ttl">COMMUNITY ALERT</div>
+          <div class="ea-desc">Notify nearby residents to verify and add supporting evidence</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ─── DASHBOARD (was Ledger) ─── -->
+<div class="screen" id="s-ledger">
+  <div class="wrap" style="max-width:960px;">
+    <div class="pg-title">📊 Escalation Dashboard</div>
+    <div class="pg-sub">// ISSUE TRACKING · RESPONSE METRICS · MODERATION STATS //</div>
+
+    <div class="dash-stats">
+      <div class="ds-cell"><div class="ds-lbl">ISSUES REPORTED</div><div class="ds-val" style="color:var(--blue2)" id="totalComplaints">4,821</div></div>
+      <div class="ds-cell"><div class="ds-lbl">AVG RESPONSE TIME</div><div class="ds-val" style="color:var(--warn)">38h</div></div>
+      <div class="ds-cell"><div class="ds-lbl">ISSUES RESOLVED</div><div class="ds-val" style="color:var(--green)" id="totalResolved">147</div></div>
+    </div>
+
+    <!-- Moderation panel -->
+    <div class="sec-hdr"><div class="sec-ttl">TRUST &amp; MODERATION</div><span class="badge badge-g">AI FILTERED</span></div>
+    <div class="mod-panel">
+      <div class="mod-card">
+        <div class="mod-ico">🛡️</div>
+        <div class="mod-ttl">DUPLICATE DETECTION</div>
+        <div class="mod-val" style="color:var(--green)">312</div>
+        <div class="mod-desc">Duplicate reports blocked this month</div>
+      </div>
+      <div class="mod-card">
+        <div class="mod-ico">⚠️</div>
+        <div class="mod-ttl">SPAM FILTERED</div>
+        <div class="mod-val" style="color:var(--warn)">89</div>
+        <div class="mod-desc">Low trust reports flagged for review</div>
+      </div>
+      <div class="mod-card">
+        <div class="mod-ico">✅</div>
+        <div class="mod-ttl">VERIFIED REPORTS</div>
+        <div class="mod-val" style="color:var(--blue2)">4,420</div>
+        <div class="mod-desc">Reports with 3+ citizen verifications</div>
+      </div>
+    </div>
+
+    <!-- Issue tracker table -->
+    <div class="sec-hdr" style="margin-top:4px;"><div class="sec-ttl">ISSUE RESPONSE TRACKER</div><span class="badge badge-b">LIVE</span></div>
+    <div class="card" style="margin-bottom:22px;overflow:hidden;">
+      <table class="dash-table">
+        <thead>
+          <tr><th>ISSUE</th><th>DEPARTMENT</th><th>REPORTED</th><th>RESPONSE TIME</th><th>WORKFLOW</th><th>STATUS</th></tr>
+        </thead>
+        <tbody>
+          <tr onclick="openHashModal('Municipal Roads Div','Pothole Oak & 5th','264 hrs','0x4f2a...','ASSIGNED')">
+            <td><div class="off-name">Pothole — Oak &amp; 5th</div><div class="off-hash">North District</div></td>
+            <td><div style="font-size:0.78rem;">Municipal Roads</div></td>
+            <td><div class="off-hash">11d ago</div></td>
+            <td><div class="lat-wrap"><span style="font-family:'DM Mono',monospace;font-size:0.57rem;color:var(--warn);">264h</span><div class="lat-bar"><div class="lat-fill" style="width:93%;background:var(--warn)"></div></div></div></td>
+            <td><div style="display:flex;gap:2px;">
+              <div style="width:12px;height:4px;border-radius:1px;background:var(--green)"></div>
+              <div style="width:12px;height:4px;border-radius:1px;background:var(--green)"></div>
+              <div style="width:12px;height:4px;border-radius:1px;background:var(--blue2)"></div>
+              <div style="width:12px;height:4px;border-radius:1px;background:var(--border)"></div>
+              <div style="width:12px;height:4px;border-radius:1px;background:var(--border)"></div>
+            </div></td>
+            <td><span class="sp sp-b">ASSIGNED</span></td>
+          </tr>
+          <tr onclick="openHashModal('Electrical Dept','Streetlight Maple','96 hrs','0x8b3d...','IN PROGRESS')">
+            <td><div class="off-name">Broken Streetlight</div><div class="off-hash">Central Zone</div></td>
+            <td><div style="font-size:0.78rem;">Electrical Dept.</div></td>
+            <td><div class="off-hash">4d ago</div></td>
+            <td><div class="lat-wrap"><span style="font-family:'DM Mono',monospace;font-size:0.57rem;color:var(--teal);">96h</span><div class="lat-bar"><div class="lat-fill" style="width:52%;background:var(--teal)"></div></div></div></td>
+            <td><div style="display:flex;gap:2px;">
+              <div style="width:12px;height:4px;border-radius:1px;background:var(--green)"></div>
+              <div style="width:12px;height:4px;border-radius:1px;background:var(--green)"></div>
+              <div style="width:12px;height:4px;border-radius:1px;background:var(--green)"></div>
+              <div style="width:12px;height:4px;border-radius:1px;background:var(--blue2)"></div>
+              <div style="width:12px;height:4px;border-radius:1px;background:var(--border)"></div>
+            </div></td>
+            <td><span class="sp sp-w">IN PROGRESS</span></td>
+          </tr>
+          <tr onclick="openHashModal('Roads Dept','Sidewalk Crack','52 hrs','0xaa3d...','RESOLVED')">
+            <td><div class="off-name">Sidewalk Crack</div><div class="off-hash">South Block</div></td>
+            <td><div style="font-size:0.78rem;">Roads Dept.</div></td>
+            <td><div class="off-hash">6d ago</div></td>
+            <td><div class="lat-wrap"><span style="font-family:'DM Mono',monospace;font-size:0.57rem;color:var(--green);">52h ✓</span><div class="lat-bar"><div class="lat-fill" style="width:26%;background:var(--green)"></div></div></div></td>
+            <td><div style="display:flex;gap:2px;">
+              <div style="width:12px;height:4px;border-radius:1px;background:var(--green)"></div>
+              <div style="width:12px;height:4px;border-radius:1px;background:var(--green)"></div>
+              <div style="width:12px;height:4px;border-radius:1px;background:var(--green)"></div>
+              <div style="width:12px;height:4px;border-radius:1px;background:var(--green)"></div>
+              <div style="width:12px;height:4px;border-radius:1px;background:var(--green)"></div>
+            </div></td>
+            <td><span class="sp sp-g">RESOLVED</span></td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="sec-hdr" style="margin-top:24px;"><div class="sec-ttl">🏆 TOP CONTRIBUTORS</div><span class="badge badge-gold">ALL TIME</span></div>
+    <div class="card" style="margin-bottom:22px;overflow:hidden;" id="globalLbContainer"></div>
+  </div>
+</div>
+
+<!-- ─── REWARDS ─── -->
+<div class="screen" id="s-rewards">
+  <div class="wrap" style="max-width:940px;">
+    <div class="pg-title">🏆 Rewards &amp; Impact</div>
+    <div class="pg-sub">// CIVIC POINTS · ACHIEVEMENTS · COMMUNITY IMPACT //</div>
+    <div class="player-banner">
+      <div class="rank-box"><div class="rank-lbl">CIVIC</div><div class="rank-num" id="rankNum">07</div><div class="rank-lbl">WARDEN</div></div>
+      <div style="flex:1;">
+        <div class="pl-name" id="plName">@CitizenReporter</div>
+        <div class="pl-stats">
+          <div class="pl-stat">REPORTS <strong id="plRaids">41</strong></div>
+          <div class="pl-stat">RESOLVED <strong id="plWins">18</strong></div>
+          <div class="pl-stat">POINTS <strong id="plXP">8,840</strong></div>
+          <div class="pl-stat">TRUST <strong style="color:var(--green)">HIGH</strong></div>
+          <div class="pl-stat">STREAK <strong>🔥6</strong></div>
+        </div>
+      </div>
+      <div class="civic-pts"><div class="civic-num" id="manaNum">247</div><div class="civic-lbl">POINTS</div></div>
+    </div>
+    <div class="xp-block">
+      <div class="xp-meta"><span>LVL <span id="xpLvl">7</span></span><span style="color:var(--blue2)" id="xpVal">8,840 / 14,200 XP</span><span>LVL 8</span></div>
+      <div class="xp-bar2"><div class="xp-bar2-fill" id="xpBar"></div></div>
+      <div style="font-family:'DM Mono',monospace;font-size:0.56rem;color:var(--dim2);margin-top:4px;">5,360 XP to rank: DISTRICT MARSHAL</div>
+    </div>
+    <div class="sec-hdr" style="margin-top:22px;"><div class="sec-ttl">REWARDS SHOP</div><span class="badge badge-b" id="manaShopBadge">247 POINTS</span></div>
+    <div class="rewards-grid">
+      <div class="rw-card" onclick="claimReward(this,'☕ Coffee Voucher',50)"><div class="rw-ico">☕</div><div class="rw-name">COFFEE VOUCHER</div><div class="rw-desc">Free coffee at local café partners who support civic engagement.</div><div class="rw-cost">50 POINTS</div></div>
+      <div class="rw-card" onclick="claimReward(this,'🚌 30-Day Bus Pass',200)"><div class="rw-ico">🚌</div><div class="rw-name">30-DAY BUS PASS</div><div class="rw-desc">Free public transit pass, sponsored by city transit authority.</div><div class="rw-cost">200 POINTS</div></div>
+      <div class="rw-card" onclick="claimReward(this,'🥇 Gold Contributor Badge',100)"><div class="rw-ico">🥇</div><div class="rw-name">GOLD BADGE</div><div class="rw-desc">Exclusive digital badge for verified top contributors.</div><div class="rw-cost">100 POINTS</div></div>
+      <div class="rw-card locked"><div class="rw-ico">🎫</div><div class="rw-name">RTI ASSISTANCE</div><div class="rw-desc">Priority RTI filing help for complex civic disputes.</div><div class="rw-cost">500 POINTS</div><div class="lock-over">🔒</div></div>
+      <div class="rw-card locked"><div class="rw-ico">📰</div><div class="rw-name">MEDIA SPOTLIGHT</div><div class="rw-desc">Your issue highlighted to local press and community networks.</div><div class="rw-cost">300 POINTS</div><div class="lock-over">🔒</div></div>
+      <div class="rw-card locked"><div class="rw-ico">🏛️</div><div class="rw-name">ADVISORY SEAT</div><div class="rw-desc">Top contributors get advisory roles at local council meetings.</div><div class="rw-cost">1000 POINTS</div><div class="lock-over">🔒</div></div>
+    </div>
+    <div class="sec-hdr"><div class="sec-ttl">ACHIEVEMENTS</div></div>
+    <div class="ach-grid">
+      <div class="ach earned" onclick="toast('🌟 First Report — 10 XP')"><div class="ach-ico">🌟</div><div class="ach-name">FIRST REPORT</div></div>
+      <div class="ach earned" onclick="toast('👥 Community Voice — 50 XP')"><div class="ach-ico">👥</div><div class="ach-name">COMMUNITY VOICE</div></div>
+      <div class="ach earned" onclick="toast('⚡ District Champion — 100 XP')"><div class="ach-ico">⚡</div><div class="ach-name">DISTRICT CHAMP</div></div>
+      <div class="ach" onclick="toast('🔒 Resolve 25 issues to unlock!')"><div class="ach-ico">🔒</div><div class="ach-name">PROBLEM SOLVER</div></div>
+      <div class="ach earned" onclick="toast('🛡️ Verified Citizen — 25 XP')"><div class="ach-ico">🛡️</div><div class="ach-name">VERIFIED CITIZEN</div></div>
+      <div class="ach earned" onclick="toast('🌆 City Observer — 30 XP')"><div class="ach-ico">🌆</div><div class="ach-name">CITY OBSERVER</div></div>
+      <div class="ach" onclick="toast('🔒 Fix a pothole to unlock!')"><div class="ach-ico">🔒</div><div class="ach-name">ROAD GUARDIAN</div></div>
+      <div class="ach" onclick="toast('🔒 100 reports to unlock!')"><div class="ach-ico">🔒</div><div class="ach-name">CENTURION</div></div>
+    </div>
+  </div>
+</div>
+
+<!-- ─── PROFILE ─── -->
+<div class="screen" id="s-profile">
+  <div class="wrap" style="max-width:800px;">
+    <div class="pg-title">👤 Citizen Profile</div>
+    <div class="pg-sub">// IDENTITY · TRUST SCORE · CONTRIBUTION HISTORY //</div>
+    <div class="profile-banner">
+      <div class="profile-pic">👤</div>
+      <div style="flex:1;">
+        <div class="pf-name" id="pfName">CitizenReporter</div>
+        <div class="pf-handle" id="pfHandle">@CitizenReporter · New Delhi, IN</div>
+        <div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:6px;">
+          <div class="pf-verified" id="pfVerified">🛡️ IDENTITY VERIFIED · OTP Confirmed</div>
+          <div class="pf-trust">✅ TRUST SCORE: HIGH · 47 verifications</div>
+        </div>
+        <div class="pl-stats" style="margin-top:9px;">
+          <div class="pl-stat">SINCE <strong>JAN 2025</strong></div>
+          <div class="pl-stat">REPORTS <strong id="pfRaids">41</strong></div>
+          <div class="pl-stat">RESOLVED <strong id="pfWins">18</strong></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="settings-block">
+      <div class="sb-ttl">📊 IMPACT SUMMARY</div>
+      <div class="sb-body">
+        <div class="setting-row"><div class="setting-info"><label>Issues Reported</label><small>Total civic issues you have documented and submitted</small></div><span style="font-family:'DM Mono',monospace;color:var(--blue2);font-size:0.88rem;">41</span></div>
+        <div class="setting-row"><div class="setting-info"><label>Issues Resolved</label><small>Reports that led to actual civic improvements</small></div><span style="font-family:'DM Mono',monospace;color:var(--green);font-size:0.88rem;">18</span></div>
+        <div class="setting-row"><div class="setting-info"><label>Trust Score</label><small>Based on accuracy, verification history, and community trust</small></div><span style="font-family:'DM Mono',monospace;color:var(--green);font-size:0.88rem;">HIGH (94%)</span></div>
+        <div class="setting-row"><div class="setting-info"><label>Fake Reports Flagged</label><small>Your duplicate and spam detection contributions</small></div><span style="font-family:'DM Mono',monospace;color:var(--teal);font-size:0.88rem;">0</span></div>
+      </div>
+    </div>
+
+    <div class="settings-block">
+      <div class="sb-ttl">⚙️ NOTIFICATIONS</div>
+      <div class="sb-body">
+        <div class="setting-row"><div class="setting-info"><label>Issue Updates</label><small>Get notified when your reported issues change status</small></div><div class="toggle on" onclick="this.classList.toggle('on')"></div></div>
+        <div class="setting-row"><div class="setting-info"><label>Nearby Issue Alerts</label><small>New issues reported within 2km of your location</small></div><div class="toggle on" onclick="this.classList.toggle('on')"></div></div>
+        <div class="setting-row"><div class="setting-info"><label>Department Responses</label><small>When assigned departments respond to escalations</small></div><div class="toggle" onclick="this.classList.toggle('on')"></div></div>
+        <div class="setting-row"><div class="setting-info"><label>Community Updates</label><small>Weekly civic impact report for your district</small></div><div class="toggle on" onclick="this.classList.toggle('on')"></div></div>
+      </div>
+    </div>
+
+    <div style="display:flex;gap:10px;margin-top:8px;">
+      <button class="btn btn-ghost" onclick="go('zkp')"><span>🛡️ RE-VERIFY IDENTITY</span></button>
+      <button class="btn btn-b" onclick="go('scan')"><span>📷 REPORT NEW ISSUE</span></button>
+    </div>
+  </div>
+</div>
+
+</div><!-- /appMain -->
+
+<!-- TOAST -->
+<div id="toast"></div>
+
+<!-- ══ MODALS ══ -->
+<!-- Notifications -->
+<div class="modal-bg" id="notifModal">
+  <div class="modal-box">
+    <div class="modal-head">🔔 NOTIFICATIONS <button class="modal-close" onclick="closeModal('notifModal')">✕</button></div>
+    <div class="modal-body" style="font-family:'DM Mono',monospace;font-size:0.66rem;color:var(--text);line-height:3;">
+      <div>✅ <span style="color:var(--green)">RESOLVED</span> — Sidewalk Crack, South Block</div>
+      <div>⚙️ <span style="color:var(--blue2)">IN PROGRESS</span> — Streetlight repair scheduled</div>
+      <div>🔔 <span style="color:var(--warn)">47 citizens</span> verified your pothole report</div>
+      <div>🏆 <span style="color:var(--gold)">Achievement unlocked:</span> Community Voice</div>
+    </div>
+  </div>
+</div>
+
+<!-- Raid modal -->
+<div class="modal-bg" id="raidModal">
+  <div class="modal-box">
+    <div class="modal-head" id="raidModalTitle">ISSUE DETAILS</div>
+    <div class="modal-body" id="raidModalBody"></div>
+  </div>
+</div>
+
+<!-- Hash/detail modal -->
+<div class="modal-bg" id="hashModal">
+  <div class="modal-box">
+    <div class="modal-head" id="hashModalTitle">ISSUE RECORD <button class="modal-close" onclick="closeModal('hashModal')">✕</button></div>
+    <div class="modal-body" id="hashModalBody"></div>
+  </div>
+</div>
+
+<script>
+// ══════════════════════════════════════
+//  STATE
+// ══════════════════════════════════════
+const STATE = {
+  currentScreen: 'splash',
+  mapFilter: 'all',
+  zkStage: 1,
+  selectedRaidId: null,
+  totalComplaints: 4821,
+  user: {
+    name:'CitizenReporter', verified:false, xp:8840, raids:41, wins:18, mana:247,
+    mobile:'', citizenName:'',
+  },
+  raids: [
+    {id:'r1',icon:'🕳️',name:'Pothole — Oak & 5th',loc:'Oak Ave & 5th St',dist:'North',district:'North District',days:11,raiders:47,max:50,status:'active',cls:'active',code:'Roads Priority'},
+    {id:'r2',icon:'💡',name:'Broken Streetlight',loc:'Maple Rd & 3rd',dist:'Central',district:'Central Zone',days:4,raiders:28,max:50,status:'active',cls:'active',code:'Electrical'},
+    {id:'r3',icon:'🚧',name:'Sidewalk Damage',loc:'Park Blvd',dist:'South',district:'South Block',days:6,raiders:50,max:50,status:'resolved',cls:'resolved',code:'Footpath'},
+    {id:'r4',icon:'🗑️',name:'Garbage Overflow',loc:'East Market',dist:'East',district:'East Sector',days:2,raiders:15,max:50,status:'active',cls:'active',code:'Sanitation'},
+    {id:'r5',icon:'💧',name:'Blocked Drain',loc:'West Colony',dist:'West',district:'West Area',days:8,raiders:42,max:50,status:'critical',cls:'critical',code:'Drainage'},
+    {id:'r6',icon:'🌊',name:'Road Flooding',loc:'Lal Qila Rd',dist:'North',district:'North District',days:3,raiders:33,max:50,status:'critical',cls:'critical',code:'Drainage'},
+    {id:'r7',icon:'🔆',name:'Missing Street Sign',loc:'City Center',dist:'Central',district:'Central Zone',days:14,raiders:10,max:50,status:'active',cls:'active',code:'Roads'},
+  ],
+  raidPositions:{
+    r1:[42,30],r2:[55,48],r3:[48,65],r4:[72,35],r5:[15,50],r6:[40,18],r7:[53,58]
+  }
+};
+
+const LB_DATA=[
+  {name:'CivicChampion',raids:89,xp:22400,me:false},
+  {name:'RoadWarrior',raids:74,xp:18900,me:false},
+  {name:'NorthWarden',raids:62,xp:15100,me:false},
+  {name:'CitizenReporter',raids:41,xp:8840,me:true},
+  {name:'DelhiWatcher',raids:38,xp:8200,me:false},
+  {name:'PotholeTracker',raids:31,xp:6400,me:false},
+];
+
+// ══════════════════════════════════════
+//  NAVIGATION
+// ══════════════════════════════════════
+function go(screen){
+  document.querySelectorAll('.screen').forEach(s=>{s.classList.remove('active');});
+  document.querySelectorAll('.nav-tab').forEach(t=>{t.classList.remove('active');});
+  const s=document.getElementById('s-'+screen);
+  if(s)s.classList.add('active');
+  const t=document.getElementById('tab-'+screen);
+  if(t)t.classList.add('active');
+  STATE.currentScreen=screen;
+  if(screen==='map'){
+    // Init Leaflet map after DOM is visible (needed for tile rendering)
+    setTimeout(()=>{
+      if(!leafMap) initLeafletMap();
+      else {leafMap.invalidateSize();renderLeafletMarkers();}
+    },60);
+  }
+  if(screen==='siege')renderSiege();
+  if(screen==='rewards')renderRewards();
+  if(screen==='profile')renderProfile();
+  if(screen==='ledger')renderLedger();
+}
+
+// ══════════════════════════════════════
+//  SCAN
+// ══════════════════════════════════════
+let stream=null;
+function setScanTab(tab){
+  ['cam','upload'].forEach(t=>{
+    document.getElementById('stab-'+t).classList.toggle('active',t===tab);
+    document.getElementById('scan-'+t+'-panel').style.display=t===tab?'block':'none';
+  });
+  if(tab!=='cam')stopCamera();
+}
+async function startCamera(){
+  try{
+    stream=await navigator.mediaDevices.getUserMedia({video:{facingMode:'environment'},audio:false});
+    const v=document.getElementById('camFeed');v.srcObject=stream;v.style.display='block';
+    document.getElementById('camPlaceholder').style.display='none';
+    document.getElementById('camScanLine').classList.add('scanning');
+    document.getElementById('camCaptureBtn').disabled=false;
+    document.getElementById('camCaptureBtn').style.opacity='1';
+    document.getElementById('camStartBtn').style.display='none';
+    document.getElementById('camStopBtn').style.display='inline-flex';
+    toast('📷 Camera started — scanning for civic issues...');
+    startAIDetection();
+  }catch(e){toast('⚠ Camera access denied');}
+}
+function stopCamera(){
+  if(stream){stream.getTracks().forEach(t=>t.stop());stream=null;}
+  const v=document.getElementById('camFeed');v.srcObject=null;v.style.display='none';
+  document.getElementById('camPlaceholder').style.display='flex';
+  document.getElementById('camScanLine').classList.remove('scanning');
+  document.getElementById('camCaptureBtn').disabled=true;
+  document.getElementById('camCaptureBtn').style.opacity='.4';
+  document.getElementById('camStartBtn').style.display='inline-flex';
+  document.getElementById('camStopBtn').style.display='none';
+  document.getElementById('camChips').innerHTML='';
+  document.getElementById('camHud').innerHTML='';
+  document.getElementById('arOverlay').style.display='none';
+}
+const aiLabels=['Scanning surface...','Object detection active','Depth analysis...','No issues detected'];
+let aiIdx=0,aiIv;
+function startAIDetection(){
+  clearInterval(aiIv);aiIdx=0;
+  aiIv=setInterval(()=>{
+    const chips=document.getElementById('camChips');
+    chips.innerHTML='';
+    const chip=document.createElement('div');chip.className='cam-chip';chip.textContent=aiLabels[aiIdx%aiLabels.length];
+    chips.appendChild(chip);aiIdx++;
+  },1200);
+}
+function capturePhoto(){
+  clearInterval(aiIv);
+  document.getElementById('camChips').innerHTML='';
+  toast('🤖 AI analysing image...');
+  simulateScan('cam');
+}
+function handleDrop(e){
+  e.preventDefault();document.getElementById('uploadZone').classList.remove('dragover');
+  const f=e.dataTransfer.files;if(f[0]&&f[0].type.startsWith('image/'))loadPreview(f[0]);
+}
+function handleFileSelect(files){if(files[0])loadPreview(files[0]);}
+function loadPreview(file){
+  const r=new FileReader();
+  r.onload=e=>{
+    document.getElementById('uploadImg').src=e.target.result;
+    document.getElementById('uploadPreview').style.display='block';
+    document.getElementById('uploadActionRow').style.display='flex';
+    document.getElementById('uploadZone').style.display='none';
+  };r.readAsDataURL(file);
+}
+function clearUpload(){
+  document.getElementById('uploadPreview').style.display='none';
+  document.getElementById('uploadActionRow').style.display='none';
+  document.getElementById('uploadZone').style.display='block';
+  document.getElementById('uploadImg').src='';
+  document.getElementById('scanResult').classList.remove('show');
+  document.getElementById('trustIndicator').style.display='none';
+}
+function analyzeUpload(){toast('🤖 AI analysing image...');simulateScan('upload');}
+function simulateScan(mode){
+  const line=document.getElementById(mode==='cam'?'camScanLine':'uploadScanLine');
+  const hud=document.getElementById(mode==='cam'?'camHud':'uploadHud');
+  const arOverlay=document.getElementById(mode==='cam'?'arOverlay':'uploadArOverlay');
+  line.classList.add('scanning');
+  let stage=0;
+  const iv=setInterval(()=>{
+    stage++;
+    if(stage===1){hud.innerHTML='DETECTING...';}
+    else if(stage===2){
+      hud.innerHTML='POTHOLE DETECTED';
+      arOverlay.style.display='flex';
+      arOverlay.innerHTML='<span class="ar-tag sev-high">SEV: HIGH</span><span class="ar-tag">DEPTH: ~10cm</span><span class="ar-tag">AREA: 0.8m²</span>';
+    }
+    else if(stage===3){hud.innerHTML='C2PA: VERIFIED';}
+    else{clearInterval(iv);line.classList.remove('scanning');showScanResult();toast('✓ Issue detected & AI-verified!');}
+  },600);
+}
+function showScanResult(){
+  document.getElementById('trustIndicator').style.display='flex';
+  const r=document.getElementById('scanResult');
+  document.getElementById('srTags').innerHTML=
+    '<span class="badge badge-t">POTHOLE</span>'+
+    '<span class="badge badge-w">SEV: HIGH</span>'+
+    '<span class="badge badge-g">AI VERIFIED</span>'+
+    '<span class="badge badge-b">DEPTH: ~10cm</span>';
+  document.getElementById('srAi').innerHTML=
+    '<strong>AI Classification:</strong> Road surface failure / pothole — Confidence 94.2%<br>'+
+    '<strong>Estimated Depth:</strong> 8–12cm (AR depth estimation)<br>'+
+    '<strong>Affected Area:</strong> ~0.8m² · Hazard to vehicles and pedestrians<br>'+
+    '<strong>GPS:</strong> 28.6139°N, 77.2090°E · Verified<br>'+
+    '<strong>Assigned Dept:</strong> Municipal Roads Division · Priority: HIGH';
+  r.classList.add('show');
+  document.getElementById('issueType').value='Pothole / Road Damage';
+}
+
+// ══════════════════════════════════════
+//  VERIFICATION (was ZKP)
+// ══════════════════════════════════════
+function syncState(f,v){STATE.user[f==='name'?'citizenName':f]=v;}
+function zGo(n){
+  const total=4;
+  for(let i=1;i<=total;i++){
+    const st=document.getElementById('zst'+i);
+    const pn=document.getElementById('zp'+i);
+    if(st){st.classList.remove('active','done');if(i<n)st.classList.add('done');if(i===n)st.classList.add('active');}
+    if(pn)pn.style.display=(i===n)?'block':'none';
+  }
+  STATE.zkStage=n;
+}
+function z1Submit(){
+  if(!document.getElementById('aName').value||!document.getElementById('aMobile').value){toast('⚠ Fill all fields');return;}
+  STATE.user.citizenName=document.getElementById('aName').value;
+  const mob=document.getElementById('aMobile').value;
+  setText('maskedMob',mob.slice(0,-2).replace(/\d/g,'X')+mob.slice(-2));
+  document.getElementById('numDisplay').textContent='CGRID-'+Math.random().toString(36).substr(2,8).toUpperCase();
+  zGo(2);startOTPTimer();
+}
+function oNext(el,idx){if(el.value&&idx<5)document.getElementById('o'+(idx+1)).focus();}
+let otpIv;
+function startOTPTimer(){
+  let s=45;clearInterval(otpIv);
+  otpIv=setInterval(()=>{s--;if(s<0){clearInterval(otpIv);return;}setText('otpTimer',String(Math.floor(s/60)).padStart(2,'0')+':'+String(s%60).padStart(2,'0'));},1000);
+}
+function z2Submit(){
+  const otp=[0,1,2,3,4,5].map(i=>document.getElementById('o'+i).value).join('');
+  if(otp.length<6){toast('⚠ Enter 6-digit OTP');return;}
+  zGo(3);
+}
+let zkDone=false;
+function runProof(){
+  if(zkDone)return;
+  document.getElementById('zkGenBtn').disabled=true;
+  document.getElementById('zkGenBtn').textContent='ANALYSING...';
+  const term=document.getElementById('tsTerm');term.innerHTML='';
+  const lines=[
+    {c:'ip-b',t:'// TRUST SCORE ENGINE — CHAOS GRID v1.0'},
+    {c:'ip-d',t:'» Checking report history...'},
+    {c:'ip-g',t:'» No duplicate accounts detected'},
+    {c:'ip-d',t:'» Analysing location history...'},
+    {c:'ip-g',t:'» Verified locations: 12 unique areas'},
+    {c:'ip-d',t:'» Community trust rating: HIGH'},
+    {c:'ip-g',t:'» Trust Score: 94/100 — TRUSTED CITIZEN'},
+    {c:'ip-b',t:'✓ VERIFICATION COMPLETE — Welcome to CHAOS GRID'},
+  ];
+  let i=0,prog=0;
+  const iv=setInterval(()=>{
+    if(i<lines.length){
+      const d=document.createElement('div');d.className=lines[i].c;
+      d.textContent='» '+lines[i].t;term.appendChild(d);term.scrollTop=term.scrollHeight;
+      prog=Math.min(prog+13,100);
+      document.getElementById('zkBar').style.width=prog+'%';
+      setText('zkPct',prog+'%');i++;
+    }else{clearInterval(iv);zkDone=true;setTimeout(()=>{
+      STATE.user.verified=true;
+      const n=STATE.user.citizenName||'CITIZEN';
+      setText('vName',n);
+      document.getElementById('vHash').textContent='Citizen ID: CGRID-'+Math.random().toString(36).substr(2,8).toUpperCase();
+      zGo(4);
+      document.getElementById('zkpNavBtn').style.borderColor='var(--green)';
+      document.getElementById('zkpNavBtn').style.color='var(--green)';
+      toast('✓ Identity verified — Trust Score: HIGH');
+    },400);}
+  },350);
+}
+
+// ══════════════════════════════════════
+//  SCAN SUBMIT
+// ══════════════════════════════════════
+function setSev(btn,lvl){document.querySelectorAll('.sev-btn').forEach(b=>{b.className='sev-btn';});btn.classList.add(lvl);}
+function submitReport(){
+  if(!document.getElementById('issueType').value){toast('⚠ Select an issue type first');return;}
+  STATE.totalComplaints++;
+  toast('✅ Report submitted! Added to escalation queue.');
+  setTimeout(()=>{go('map');renderMap();},1000);
+}
+
+// ══════════════════════════════════════
+//  RAIDS GEO DATA (Bengaluru real coords)
+// ══════════════════════════════════════
+const RAIDS_GEO=[
+  {id:'raid-1',lat:12.9762,lng:77.6033,name:'MG Road Pothole Cluster',loc:'MG Road, Ward 68',district:'Central Zone',type:'Pothole / Road Damage',status:'critical',cls:'critical',icon:'🕳️',raiders:47,max:50,days:14,desc:'Multiple large potholes spanning 200m near Trinity Circle. BBMP notified 4 times with zero action.'},
+  {id:'raid-2',lat:12.9254,lng:77.5938,name:'Jayanagar Water Main Break',loc:'Jayanagar 4th Block',district:'South Block',type:'Water Main Break',status:'active',cls:'active',icon:'💧',raiders:31,max:50,days:12,desc:'Water main burst flooding residential street for 12 days. 200+ households affected.'},
+  {id:'raid-3',lat:12.9784,lng:77.6408,name:'Indiranagar Streetlights Out',loc:'100 Feet Rd, Indiranagar',district:'East Sector',type:'Broken Streetlight',status:'active',cls:'active',icon:'💡',raiders:18,max:50,days:6,desc:'7 consecutive streetlights non-functional. Safety hazard with reported chain-snatching.'},
+  {id:'raid-4',lat:12.9352,lng:77.6245,name:'Koramangala Garbage Dump',loc:'Koramangala 1st Block',district:'South Block',type:'Garbage / Illegal Dumping',status:'active',cls:'active',icon:'🗑️',raiders:38,max:50,days:21,desc:'Unauthorized 400sqft garbage dump. Severe health hazard with stray animal menace.'},
+  {id:'raid-5',lat:12.9698,lng:77.7499,name:'Whitefield Road Erosion',loc:'Whitefield Main Road',district:'East Sector',type:'Road Damage',status:'active',cls:'active',icon:'🛣️',raiders:9,max:50,days:9,desc:'Severe road erosion near Metro station. 15,000+ vehicles daily.'},
+  {id:'raid-6',lat:13.0358,lng:77.5970,name:'Hebbal Flyover Drainage Block',loc:'Hebbal Flyover, North',district:'North District',type:'Drainage Blockage',status:'active',cls:'active',icon:'🌊',raiders:22,max:50,days:8,desc:'Drainage completely blocked causing waterlogging during any rainfall.'},
+  {id:'raid-7',lat:12.9165,lng:77.6101,name:'BTM Layout Footpath Encroachment',loc:'BTM Layout 2nd Stage',district:'South Block',type:'Encroachment',status:'active',cls:'active',icon:'🚧',raiders:14,max:50,days:31,desc:'Commercial vendors permanently occupying full 3m footpath.'},
+];
+
+// ══════════════════════════════════════
+//  LEAFLET MAP
+// ══════════════════════════════════════
+let leafMap=null,leafMarkers=[],leafFilter='all';
+
+function initLeafletMap(){
+  if(leafMap)return; // already initialised
+  leafMap=L.map('leafletMap',{zoomControl:true,attributionControl:true}).setView([12.9716,77.5946],12);
+  L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',{
+    attribution:'©<a href="https://www.openstreetmap.org">OSM</a> ©<a href="https://carto.com">CartoDB</a>',
+    maxZoom:19
+  }).addTo(leafMap);
+  renderLeafletMarkers();
+  // Fix rendering when tab becomes visible
+  setTimeout(()=>leafMap.invalidateSize(),100);
+}
+
+function getMarkerColor(r){
+  if(r.status==='critical')return '#ff3344';
+  if(r.status==='resolved')return '#39ff7a';
+  return '#ffcc00';
+}
+
+function renderLeafletMarkers(){
+  // Remove old markers
+  leafMarkers.forEach(m=>leafMap.removeLayer(m));
+  leafMarkers=[];
+  RAIDS_GEO.forEach(r=>{
+    const show=leafFilter==='all'||r.status===leafFilter;
+    if(!show)return;
+    const col=getMarkerColor(r);
+    const sz=r.status==='critical'?22:r.status==='resolved'?14:17;
+    const pulseAnim=r.status!=='resolved'?`animation:rzpulse 2s ease-in-out infinite;`:'';
+    const icon=L.divIcon({
+      html:`<div style="position:relative;width:${sz}px;height:${sz}px;">
+        <div style="position:absolute;inset:0;border-radius:50%;border:1px solid ${col};${pulseAnim}opacity:.5;"></div>
+        <div style="position:absolute;inset:25%;border-radius:50%;background:${col};box-shadow:0 0 12px ${col};"></div>
+      </div>`,
+      className:'',iconSize:[sz,sz],iconAnchor:[sz/2,sz/2]
+    });
+    const pct=Math.round(r.raiders/r.max*100);
+    const statusCol=r.status==='critical'?'red':r.status==='resolved'?'green':'warn';
+    const marker=L.marker([r.lat,r.lng],{icon}).addTo(leafMap);
+    marker.bindPopup(`
+      <div class="cg-popup">
+        <h4>${r.icon} ${r.name}</h4>
+        <div class="cp-row"><span class="cp-label">LOCATION</span><span class="cp-val">📍 ${r.loc}</span></div>
+        <div class="cp-row"><span class="cp-label">DISTRICT</span><span class="cp-val">${r.district}</span></div>
+        <div class="cp-row"><span class="cp-label">TYPE</span><span class="cp-val">${r.type}</span></div>
+        <div class="cp-row"><span class="cp-label">VERIFIED BY</span><span class="cp-val">${r.raiders}/${r.max} citizens</span></div>
+        <div class="cp-row"><span class="cp-label">UNRESOLVED</span><span class="cp-val ${statusCol}">${r.days} DAYS</span></div>
+        <div class="cp-row"><span class="cp-label">STATUS</span><span class="cp-val ${statusCol}">${r.status.toUpperCase()}</span></div>
+        <div style="margin:8px 0 4px;height:3px;background:#1a1a1a;border-radius:2px;overflow:hidden;">
+          <div style="height:100%;width:${pct}%;background:${col};border-radius:2px;"></div>
+        </div>
+        <div style="font-size:9px;color:#555;margin-bottom:8px;">${pct}% TOWARD ESCALATION THRESHOLD</div>
+        <button class="cp-btn primary" onclick="leafJoin('${r.id}')">✓ JOIN &amp; VERIFY</button>
+        <button class="cp-btn" style="margin-top:4px;" onclick="go('scan')">📷 SCAN ISSUE</button>
+      </div>`,{maxWidth:240,className:''}
+    );
+    leafMarkers.push(marker);
+  });
+  renderSidebar();
+}
+
+function filterMap(f){
+  leafFilter=f;
+  if(leafMap) renderLeafletMarkers();
+  STATE.mapFilter=f;
+}
+
+function filterMapBySearch(q){
+  const ql=q.toLowerCase();
+  leafMarkers.forEach(m=>leafMap.removeLayer(m));
+  leafMarkers=[];
+  RAIDS_GEO.forEach(r=>{
+    if(!(r.name.toLowerCase().includes(ql)||r.district.toLowerCase().includes(ql)||r.type.toLowerCase().includes(ql)||r.loc.toLowerCase().includes(ql)))return;
+    const col=getMarkerColor(r);
+    const sz=17;
+    const icon=L.divIcon({
+      html:`<div style="position:relative;width:${sz}px;height:${sz}px;"><div style="position:absolute;inset:0;border-radius:50%;border:1px solid ${col};opacity:.5;"></div><div style="position:absolute;inset:25%;border-radius:50%;background:${col};box-shadow:0 0 12px ${col};"></div></div>`,
+      className:'',iconSize:[sz,sz],iconAnchor:[sz/2,sz/2]
+    });
+    const marker=L.marker([r.lat,r.lng],{icon}).addTo(leafMap);
+    leafMarkers.push(marker);
+  });
+}
+
+function leafJoin(raidId){
+  const r=RAIDS_GEO.find(x=>x.id===raidId);
+  if(!r||r.status==='resolved'){toast('✅ This issue is already resolved!');return;}
+  r.raiders=Math.min(r.raiders+1,r.max);
+  STATE.user.raids++;STATE.user.xp+=50;
+  toast(`✓ Verified: ${r.name} — ${r.raiders} citizens total`);
+  if(r.raiders>=r.max&&r.status!=='critical'){r.status='critical';r.cls='critical';toast('⚡ 50 verifications reached — escalating to department!');}
+  leafMap.closePopup();
+  renderLeafletMarkers();
+  renderRewards();renderProfile();renderSidebar();
+}
+
+function renderMap(){
+  if(leafMap) renderLeafletMarkers();
+  else setTimeout(initLeafletMap,0);
+}
+
+// Keep sidebar working with RAIDS_GEO
+function renderSidebar(){
+  const list=document.getElementById('sidebarRaidList');
+  if(!list)return;
+  list.innerHTML='';
+  const filtered=leafFilter==='all'?RAIDS_GEO:RAIDS_GEO.filter(r=>r.status===leafFilter);
+  filtered.forEach(r=>{
+    const pct=Math.round(r.raiders/r.max*100);
+    const fillClass=r.status==='critical'?'prog-t':r.status==='resolved'?'prog-g':'prog-b';
+    const cc=r.status==='critical'?'var(--status-r)':r.status==='resolved'?'var(--green)':'var(--blue2)';
+    const d=document.createElement('div');d.className='rc';
+    d.innerHTML=`
+      <div class="rc-head">
+        <div class="rc-ico">${r.icon}</div>
+        <div>
+          <div class="rc-name">${r.name}</div>
+          <div class="rc-loc">📍 ${r.loc} · ${r.district}</div>
+        </div>
+      </div>
+      <div class="rc-bar-wrap">
+        <div class="rc-meta">
+          <span style="color:${cc}">${r.raiders}/${r.max} verified</span>
+          <span>${r.days}d open</span>
+        </div>
+        <div class="rc-bar"><div class="rc-fill ${fillClass}" style="width:${pct}%"></div></div>
+      </div>
+      <div class="rc-wf">
+        <div class="rc-wf-step done"></div>
+        <div class="rc-wf-step done"></div>
+        <div class="rc-wf-step ${r.status==='resolved'?'done':'cur'}"></div>
+        <div class="rc-wf-step ${r.status==='resolved'?'done':''}"></div>
+        <div class="rc-wf-step ${r.status==='resolved'?'done':''}"></div>
+      </div>`;
+    d.addEventListener('click',()=>{
+      leafMap.setView([r.lat,r.lng],15);
+      // Open the popup for the matching marker
+      const idx=RAIDS_GEO.filter(x=>leafFilter==='all'||x.status===leafFilter).indexOf(r);
+      if(leafMarkers[idx])leafMarkers[idx].openPopup();
+    });
+    list.appendChild(d);
+  });
+  document.getElementById('liveCount').textContent=RAIDS_GEO.filter(r=>r.status!=='resolved').length+' LIVE';
+}
+
+// ══════════════════════════════════════
+//  RAID MODAL
+// ══════════════════════════════════════
+function openRaidModal(r){
+  const pct=Math.round(r.raiders/r.max*100);
+  const fc=r.status==='critical'?'var(--status-r)':r.status==='resolved'?'var(--green)':'var(--blue2)';
+  document.getElementById('raidModalTitle').innerHTML=r.icon+' '+r.name+' <button class="modal-close" onclick="closeModal(\'raidModal\')">✕</button>';
+  document.getElementById('raidModalBody').innerHTML=`
+    <div style="font-family:'DM Mono',monospace;font-size:0.65rem;color:var(--dim2);line-height:2.5;margin-bottom:14px;">
+      LOCATION: <span style="color:var(--white)">${r.loc}</span><br>
+      DISTRICT: <span style="color:var(--blue2)">${r.district}</span><br>
+      VERIFIED BY: <span style="color:var(--blue2)">${r.raiders} citizens</span><br>
+      UNRESOLVED: <span style="color:var(--warn)">${r.days} DAYS</span><br>
+      STATUS: <span style="color:${fc}">${r.status.toUpperCase()}</span>
+    </div>
+    <div style="height:5px;background:var(--border);margin-bottom:16px;overflow:hidden;border-radius:3px;">
+      <div style="height:100%;width:${pct}%;background:${fc};border-radius:3px;"></div>
+    </div>
+    <div style="margin-bottom:16px;">
+      <div style="font-family:'DM Mono',monospace;font-size:0.58rem;color:var(--blue2);letter-spacing:2px;margin-bottom:8px;">🏆 TOP CONTRIBUTORS (TOP 5)</div>
+      ${buildMiniLb()}
+    </div>
+    <div style="display:flex;gap:8px;">
+      <button class="btn btn-b" style="flex:1;" onclick="closeModal('raidModal');joinRaid('${r.id}');go('siege');"><span>✓ JOIN &amp; VERIFY</span></button>
+      <button class="btn btn-ghost" onclick="closeModal('raidModal')"><span>CLOSE</span></button>
+    </div>`;
+  openModal('raidModal');
+}
+function buildMiniLb(){
+  return LB_DATA.slice(0,5).map((p,i)=>{
+    const medals=['🥇','🥈','🥉','4️⃣','5️⃣'];
+    return `<div style="display:flex;align-items:center;gap:10px;padding:5px 8px;border-bottom:1px solid var(--border);font-family:'DM Mono',monospace;font-size:0.58rem;">
+      <span style="width:20px">${medals[i]}</span>
+      <span style="flex:1;color:${p.me?'var(--blue2)':'var(--text)'}">${p.name}</span>
+      <span style="color:var(--dim2)">${p.raids}R</span>
+      <span style="color:var(--blue2);font-weight:600;">${p.xp.toLocaleString()} XP</span>
+    </div>`;
+  }).join('');
+}
+
+// ══════════════════════════════════════
+//  JOIN / VERIFY
+// ══════════════════════════════════════
+function joinRaid(raidId){
+  const r=STATE.raids.find(x=>x.id===raidId);
+  if(!r||r.status==='resolved'){toast('✅ This issue is already resolved!');return;}
+  if(r.raiders>=r.max){toast('Issue fully verified — escalation in progress.');}
+  else{
+    r.raiders=Math.min(r.raiders+1,r.max);
+    STATE.user.raids++;STATE.user.xp+=50;
+    toast(`✓ You verified: ${r.name} — ${r.raiders} citizens total`);
+    if(r.raiders>=r.max&&r.status!=='critical'){r.status='critical';r.cls='critical';toast('⚡ 50 verifications reached — escalating to department!');}
+    STATE.selectedRaidId=raidId;
+  }
+  renderRewards();renderProfile();renderSiege();
+  if(STATE.currentScreen==='map')renderMap();
+}
+
+// ══════════════════════════════════════
+//  SIEGE / ESCALATION
+// ══════════════════════════════════════
+function renderSiege(){
+  const r=STATE.selectedRaidId?STATE.raids.find(x=>x.id===STATE.selectedRaidId):STATE.raids[0];
+  if(!r)return;
+  setText('sg-raiders',r.raiders);
+  // Build voters row
+  const vr=document.getElementById('raidersRow');
+  if(vr){
+    vr.innerHTML='';
+    const names=['RS','PK','AV','SD','MK','LJ','RP','NS'];
+    for(let i=0;i<Math.min(8,r.raiders);i++){
+      const av=document.createElement('div');av.className='voter-av'+(i===0?' me':'');
+      av.textContent=['👤','🧑','👩','👨','🙋','🧑‍💼','👩‍💼','🙍'][i%8];
+      av.title=names[i];vr.appendChild(av);
+    }
+    if(r.raiders>8){
+      const more=document.createElement('div');more.className='raider-more';
+      more.textContent='+'+(r.raiders-8);vr.appendChild(more);
+    }
+  }
+  // Leaderboard
+  const lb=document.getElementById('siegeLb');
+  if(lb){
+    lb.innerHTML=LB_DATA.slice(0,5).map((p,i)=>{
+      const medals=['gold','silver','bronze','',''];
+      return `<div class="slb-row">
+        <div class="slb-rank ${medals[i]}">${['🥇','🥈','🥉','04','05'][i]}</div>
+        <div class="slb-name${p.me?' me':''}">${p.name}</div>
+        <div class="slb-xp">${p.xp.toLocaleString()}</div>
+      </div>`;
+    }).join('');
+  }
+}
+
+// ══════════════════════════════════════
+//  DASHBOARD / LEDGER
+// ══════════════════════════════════════
+function renderLedger(){
+  setText('totalComplaints',STATE.totalComplaints.toLocaleString());
+  const cont=document.getElementById('globalLbContainer');
+  if(cont){
+    cont.innerHTML=LB_DATA.map((p,i)=>{
+      const medals=['gold','silver','bronze','','',''];
+      return `<div class="slb-row">
+        <div class="slb-rank ${medals[i]}">${['🥇','🥈','🥉','04','05','06'][i]}</div>
+        <div class="slb-name${p.me?' me':''}">${p.name}</div>
+        <div class="slb-badge" style="font-size:0.6rem;color:var(--dim2);">${p.raids} reports</div>
+        <div class="slb-xp">${p.xp.toLocaleString()} XP</div>
+      </div>`;
+    }).join('');
+  }
+}
+
+function openHashModal(dept,issue,hrs,hash,status){
+  document.getElementById('hashModalTitle').innerHTML=`📋 ${issue} <button class="modal-close" onclick="closeModal('hashModal')">✕</button>`;
+  document.getElementById('hashModalBody').innerHTML=`
+    <div style="font-family:'DM Mono',monospace;font-size:0.65rem;color:var(--dim2);line-height:2.8;">
+      DEPARTMENT: <span style="color:var(--blue2)">${dept}</span><br>
+      RESPONSE TIME: <span style="color:var(--warn)">${hrs}</span><br>
+      STATUS: <span style="color:var(--green)">${status}</span><br>
+      RECORD ID: <span style="color:var(--text)">${hash}</span>
+    </div>`;
+  openModal('hashModal');
+}
+
+// ══════════════════════════════════════
+//  REWARDS
+// ══════════════════════════════════════
+function renderRewards(){
+  const u=STATE.user;
+  setText('plName','@'+u.name);setText('plRaids',u.raids);setText('plWins',u.wins);
+  setText('plXP',u.xp.toLocaleString());setText('manaNum',u.mana);
+  setText('manaShopBadge',u.mana+' POINTS');
+  const pct=Math.min(((u.xp-7000)/(14200-7000))*100,100);
+  const xb=document.getElementById('xpBar');if(xb)xb.style.width=pct+'%';
+  setText('xpVal',u.xp.toLocaleString()+' / 14,200 XP');
+}
+function claimReward(card,name,cost){
+  if(card.classList.contains('locked')){toast('🔒 Not enough points!');return;}
+  if(STATE.user.mana<cost){toast('⚠ Need '+cost+' points — you have '+STATE.user.mana);return;}
+  STATE.user.mana-=cost;toast('🎉 '+name+' claimed!');
+  renderRewards();card.style.borderColor='var(--green)';
+  setTimeout(()=>{card.style.borderColor='';},2000);
+}
+
+// ══════════════════════════════════════
+//  PROFILE
+// ══════════════════════════════════════
+function renderProfile(){
+  const u=STATE.user;
+  const name=u.citizenName||u.name;
+  setText('pfName',name);setText('pfHandle','@'+u.name+' · New Delhi, IN');
+  setText('pfRaids',u.raids);setText('pfWins',u.wins);
+  const pv=document.getElementById('pfVerified');
+  if(pv){
+    if(u.verified){pv.textContent='🛡️ IDENTITY VERIFIED · OTP Confirmed';pv.style.borderColor='var(--green)';pv.style.color='var(--green)';}
+    else{pv.textContent='⚠ NOT VERIFIED — Click to verify';pv.style.borderColor='var(--warn)';pv.style.color='var(--warn)';}
+  }
+}
+
+// ══════════════════════════════════════
+//  MODALS + TOAST + UTILS
+// ══════════════════════════════════════
+function openModal(id){document.getElementById(id).classList.add('open');}
+function closeModal(id){document.getElementById(id).classList.remove('open');}
+document.querySelectorAll('.modal-bg').forEach(bg=>{
+  bg.addEventListener('click',e=>{if(e.target===bg)bg.classList.remove('open');});
+});
+let toastTimer;
+function toast(msg){
+  const el=document.getElementById('toast');el.textContent=msg;
+  el.classList.add('show');clearTimeout(toastTimer);
+  toastTimer=setTimeout(()=>el.classList.remove('show'),2800);
+}
+function setText(id,val){const el=document.getElementById(id);if(el)el.textContent=val;}
+
+// ──────────────────────────────────────
+go('splash');
+</script>
+</body>
+</html>
