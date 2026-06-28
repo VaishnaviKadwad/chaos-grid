@@ -39,6 +39,6 @@ You can interact with the live system across both production environments:
 
 ---
 
-## 🔄 Deployment Pipeline
+## 🔄 Deployment Pipelines
 
 This project utilizes a GitHub Actions workflow to ensure high availability across platforms. Every time changes are pushed to the `main` branch, the following automated events take place:
