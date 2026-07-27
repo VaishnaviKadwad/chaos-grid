@@ -1,0 +1,15 @@
+name: Sync to Hugging Face
+on:
+  push:
+    branches: [main]
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+      - name: Push to HF
+        run: |
+          git remote add hf https://VaishnaviKadwad:${{ secrets.HF_TOKEN }}@huggingface.co/spaces/VaishnaviKadwad/chaos-grid
+          git push hf main --force
